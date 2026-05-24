@@ -3,7 +3,7 @@
 ## 项目信息
 - name: "Hermes SDD"
 - description: "通用 SDD（Spec-Driven Development）开发框架——可复用的 Agentic 开发流程引擎"
-- repo: "TBD"
+- repo: "https://github.com/NEU-JING/hermes-harness"
 
 ## 技术栈
 - runtime: "Hermes Agent Skills 系统"
