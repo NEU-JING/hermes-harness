@@ -1,0 +1,10 @@
+{
+  "change_id": "003-git-and-docs",
+  "flow_level": "Standard",
+  "current_phase": "reviewer",
+  "phases_completed": ["po", "ba", "architect", "coder"],
+  "started_at": "2026-05-25T12:00:00Z",
+  "updated_at": "2026-05-25T13:00:00Z",
+  "review_round": 2,
+  "previous_review_outcome": "不通过 — 1 CRITICAL (R10 依赖 git-workflow.md)"
+}
