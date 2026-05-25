@@ -54,55 +54,24 @@ if 'psycopg2' in requirements: database = 'PostgreSQL'
 
 #### Step A2.1: 生成 AGENTS.md
 
-使用 `skill_view(name='sdd-init', file_path='templates/agnets-template.md')` 加载模板，替换占位符 `{project_name}` 等，写入项目根目录。
+使用 `read_file(path='../../templates/AGENTS.md')` 读取模板文件，替换占位符 `{project_name}` 等，写入项目根目录。
 
 #### Step A2.2: 生成 CONSTITUTION.md
 
-使用 `skill_view(name='sdd-init', file_path='templates/constitution-template.md')` 加载模板，写入项目根目录。
+使用 `read_file(path='../../templates/CONSTITUTION.md')` 读取模板文件，写入项目根目录。
 
 #### Step A2.3: 生成 QUIRKS.md
 
-使用 `skill_view(name='sdd-init', file_path='templates/quirks-template.md')` 加载模板，写入项目根目录。
+使用 `read_file(path='../../templates/QUIRKS.md')` 读取模板文件，写入项目根目录。
 
 #### Step A2.4: 生成 .pre-commit-config.yaml
 
-```yaml
-repos:
-  - repo: https://github.com/psf/black
-    rev: 24.3.0
-    hooks:
-      - id: black
-        args: [--check]
-        stages: [commit]
-
-  - repo: https://github.com/PyCQA/isort
-    rev: 5.13.2
-    hooks:
-      - id: isort
-        args: [--check-only]
-        stages: [commit]
-
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.4.1
-    hooks:
-      - id: ruff
-        args: [--select, E, W, F]
-        stages: [commit]
-
-  - repo: local
-    hooks:
-      - id: pytest-fast
-        name: pytest (fast)
-        entry: bash -c 'cd backend && pytest tests/ -x -q'
-        language: system
-        pass_filenames: false
-        stages: [push]
-```
+使用 `read_file(path='../../templates/.pre-commit-config.yaml')` 读取模板，写入项目根目录。
 
 **自适应逻辑**：
-- Python 项目 → 如上配置
-- Go 项目 → golangci-lint + gofmt
-- 前端项目 → eslint + prettier
+- Python 项目 → 直接使用模板
+- Go 项目 → golangci-lint + gofmt（手动替换 hooks）
+- 前端项目 → eslint + prettier（手动替换 hooks）
 - 混合项目 → 合并
 
 **pytest 目录检测**：
@@ -115,32 +84,10 @@ repos:
 #### Step A2.4a: 生成 pytest.ini + conftest CI-only 支持（Python 项目）
 
 **pytest.ini**：
-```ini
-[pytest]
-markers =
-    ci_only: 仅在 CI 环境中运行的测试（需要 Docker/GPU/大内存等资源）
-```
+使用 `read_file(path='../../templates/pytest.ini')` 读取模板，写入项目根目录。
 
-**conftest.py**（创建或追加 SDD 块）：
-```python
-# SDD: CI-only marker support — auto-skip locally, run only in CI
-import os
-import pytest
-
-
-def pytest_configure(config):
-    config.addinivalue_line(
-        "markers", "ci_only: tests that require CI environment resources"
-    )
-
-
-def pytest_collection_modifyitems(config, items):
-    if os.environ.get("CI", "").lower() not in ("true", "1"):
-        skip_ci_only = pytest.mark.skip(reason="CI-only test, skipped locally")
-        for item in items:
-            if "ci_only" in item.keywords:
-                item.add_marker(skip_ci_only)
-```
+**conftest.py**：
+使用 `read_file(path='../../templates/conftest.py')` 读取模板，写入项目测试目录。
 
 **生成逻辑**：
 - Python 项目（有 setup.py/pyproject.toml/tests/）→ 生成
