@@ -77,6 +77,7 @@ Hermes Agent
 
 | 变更 ID | 标题 | 影响范围 | 归档日期 |
 |------|------|------|------|
+| 000-exploration | 项目概念探索（非 SDD 流程） | 优化方案 + 补充方案两篇原始讨论 | 2026-05-25 |
 | 001-sdd-init | SDD 项目初始化 | 8 个角色 Skill + shared/ | 2026-05-24 |
 | 002-project-onboarding | 项目上手体验 | README + INSTALL + install.sh + templates/ + sdd-init 修改 | 2026-05-25 |
 | 003-git-and-docs | Git 工作流 + 基线维护 + README | git-workflow.md + orchestrator Phase 8 + docs/current/ + README 升级 | 2026-05-25 |
