@@ -1,0 +1,34 @@
+# 模板: .pre-commit-config.yaml
+# 用途: 项目 pre-commit 检查配置。Python 项目直接使用；
+#       Go/前端项目替换 hooks 为对应工具。
+
+repos:
+  - repo: https://github.com/psf/black
+    rev: 24.3.0
+    hooks:
+      - id: black
+        args: [--check]
+        stages: [commit]
+
+  - repo: https://github.com/PyCQA/isort
+    rev: 5.13.2
+    hooks:
+      - id: isort
+        args: [--check-only]
+        stages: [commit]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.4.1
+    hooks:
+      - id: ruff
+        args: [--select, E, W, F]
+        stages: [commit]
+
+  - repo: local
+    hooks:
+      - id: pytest-fast
+        name: pytest (fast)
+        entry: bash -c 'cd backend && pytest tests/ -x -q'
+        language: system
+        pass_filenames: false
+        stages: [push]

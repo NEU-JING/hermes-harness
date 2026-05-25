@@ -1,0 +1,8 @@
+{
+  "change_id": "002-project-onboarding",
+  "flow_level": "Standard",
+  "current_phase": "coder",
+  "phases_completed": ["po", "ba", "architect"],
+  "started_at": "2026-05-25T10:00:00Z",
+  "updated_at": "2026-05-25T10:45:00Z"
+}
