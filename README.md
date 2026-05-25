@@ -9,17 +9,67 @@ AI Agent 写代码很快，但写完就忘、质量不稳、流程不透明。SD
 ## SDD 流程
 
 ```mermaid
-graph LR
-    PO[PO: 需求定义] --> BA[BA: Spec+AC]
-    BA --> AR[Architect: 设计+Task]
-    AR --> CO[Coder: TDD实现]
-    CO --> RE[Reviewer: 三阶段评审]
-    RE --> QA[QA: 测试验证]
-    QA --> UA[用户验收]
-    UA --> ARV[归档]
+graph TD
+    PO[PO: 需求定义 → prd.md] --> G1{👤 用户确认}
+    G1 -->|✅ 通过| BA[BA: Spec细化 → spec.md]
+    G1 -->|🔁 修改| PO
+
+    BA --> G2{👤 用户确认}
+    G2 -->|✅ 通过| AR[Architect: 设计 → design.md + tasks.md]
+    G2 -->|🔁 修改| BA
+
+    AR --> G3{👤 用户确认}
+    G3 -->|✅ 通过| CO[Coder: TDD实现]
+    G3 -->|🔁 修改| AR
+
+    CO --> RE{Reviewer 三阶段评审}
+    RE -->|✅ 通过| QA[QA: AC覆盖 + 测试]
+    RE -->|❌ 不通过| RE_LOOP{轮次 ≤ 2?}
+    RE_LOOP -->|是| CO
+    RE_LOOP -->|否| MB1((熔断: 用户介入))
+
+    QA -->|✅ 通过| UA{👤 用户验收}
+    QA -->|❌ 不通过| QA_LOOP{轮次 ≤ 4?}
+    QA_LOOP -->|是| CO
+    QA_LOOP -->|否| MB2((熔断: 用户介入))
+
+    UA -->|✅ 通过| ARV[归档: 基线融合]
+    UA -->|❌ 打回| UA_CLASS{分类}
+    UA_CLASS -->|需求问题| PO
+    UA_CLASS -->|设计问题| AR
+    UA_CLASS -->|代码问题| CO
 ```
 
-8 个阶段，3 种流程级别：**Quick**（Bug 修复）→ **Standard**（常规功能，默认）→ **Enhanced**（安全/性能关键）。
+### 门禁卡点（Gates）
+
+| 位置 | 门禁 | 通过条件 |
+|------|------|---------|
+| PO → BA | 👤 用户确认 | PRD 目标与范围获认可 |
+| BA → Architect | 👤 用户确认 | Spec + AC 获认可 |
+| Architect → Coder | 👤 用户确认 | 设计方案 + Task 拆分获认可 |
+| Coder → Reviewer | R1（Spec 存在） | `spec.md` 已产出 |
+| Reviewer → QA | R4（Review 报告） | Review 结论为"通过"或"有条件通过" |
+| QA → 用户验收 | AC 全覆盖 | 所有 AC 有对应测试，全部通过 |
+| 用户验收 → 归档 | 用户明确确认 | 场景实现正确 |
+| 归档前 | R10（PR 合规） | 代码通过 feature 分支 + PR 合并，非直接 push main |
+
+### 闭环与回退（Fallback）
+
+| 闭环 | 触发条件 | 回退目标 | 上限 |
+|------|---------|---------|------|
+| Reviewer ↔ Coder | Review 不通过 | Coder 根据 Review 报告修复 | **2 轮** → 熔断，用户介入 |
+| QA ↔ Coder | 测试失败 | Coder 修复后重新测试 | **4 轮** → 熔断，用户介入 |
+| 用户验收 ↔ 上游 | 场景实现不正确 | 按问题分类打回 PO/Architect/Coder | **2 轮** → 人工裁决 |
+
+> **熔断机制**：回退超过上限后，流程不再自动循环，由人类用户决定下一步（继续修复 / 降级验收 / 取消变更）。
+
+### 流程级别
+
+| 级别 | 适用场景 | 阶段裁剪 |
+|------|---------|---------|
+| **Quick** | Bug 修复、配置变更 | 跳过 PO/BA，Architect 轻量 → Coder → QA 轻量 |
+| **Standard**（默认） | 常规功能开发 | 完整 8 阶段 |
+| **Enhanced** | 安全/性能关键 | Standard + 安全审查 + 性能测试 + 灰度验证 |
 
 ---
 
