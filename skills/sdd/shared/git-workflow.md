@@ -28,17 +28,26 @@
 3. Push feature 分支
    git push origin feat/{change-id}
 
-4. 在 GitHub 创建 Pull Request
+4. 在 GitHub 创建 Pull Request（保持 OPEN）
    - 标题：feat({scope}): {变更简述}
    - 描述：使用 PR 模板
 
-5. Reviewer 评审
-   - 通过 → Squash merge
+5. Reviewer 评审（在 PR 上进行）
+   - 通过 → 进入 QA 阶段
    - 有条件通过 → 修复后更新 PR
    - 不通过 → 修复 CRITICAL 后更新 PR
 
-6. Squash Merge → main
+6. QA 验证（在 PR 合并前完成）
+
+7. 用户验收
+
+8. 验收通过 → Squash merge → main
    所有 commit 压缩为一个，保持 main 线性历史
+
+9. 归档（此时 R10 检测到 merge commit → 通过）
+```
+
+> ⚠️ **PR 在验收通过前不合并**。合并后的归档阶段，R10 通过 git log 检测 merge commit 来验证 PR 流程。
 ```
 
 ---
