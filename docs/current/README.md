@@ -11,7 +11,7 @@
 - **SDD 流程**：Standard（8 阶段：PO → BA → Architect → Coder → Reviewer → QA → 验收 → 归档）
 - **角色 Skill**：8 个（po-agent, ba-agent, architect-agent, coder-agent, reviewer-agent, qa-agent, sdd-orchestrator, sdd-init）
 - **辅助 Skill**：1 个（sdd-structure-lint）
-- **已归档变更**：2（001-sdd-init, 002-project-onboarding）
+- **已归档变更**：3（001-sdd-init, 002-project-onboarding, 003-git-and-docs）
 
 ---
 
@@ -79,3 +79,14 @@ Hermes Agent
 |------|------|------|------|
 | 001-sdd-init | SDD 项目初始化 | 8 个角色 Skill + shared/ | 2026-05-24 |
 | 002-project-onboarding | 项目上手体验 | README + INSTALL + install.sh + templates/ + sdd-init 修改 | 2026-05-25 |
+| 003-git-and-docs | Git 工作流 + 基线维护 + README | git-workflow.md + orchestrator Phase 8 + docs/current/ + README 升级 | 2026-05-25 |
+
+---
+
+## 核心文档
+
+| 文档 | 说明 |
+|------|------|
+| [prd.md](prd.md) | 产品需求文档 — 目标、用户、功能范围、成功指标 |
+| [spec.md](spec.md) | 规格说明 — 9 大需求、30+ AC、Given-When-Then 格式 |
+| [design.md](design.md) | 技术设计 — 三层架构、文件格式、数据流、关键决策 |
