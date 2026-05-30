@@ -139,8 +139,10 @@ class SDDState:
     metadata: Dict
 
 class SDDOrchestrator:
-    """SDD编排器核心类"""
-
+    """SDD编排器核心类 v2.0.0"""
+    
+    VERSION = "2.0.0"
+    
     def __init__(self, project_root: str = "."):
         self.project_root = Path(project_root)
         self.changes_dir = self.project_root / "docs" / "changes"

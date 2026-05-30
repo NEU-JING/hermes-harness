@@ -1,0 +1,8 @@
+# SDD Orchestrator v2.0 Dependencies
+# Python 3.8+
+
+# Standard library only - no external dependencies
+# argparse, dataclasses, datetime, enum, json, os, pathlib, sys, typing
+
+# Optional for enhanced functionality
+# pytest>=7.0.0  # For testing
