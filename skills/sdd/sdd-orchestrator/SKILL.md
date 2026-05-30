@@ -16,7 +16,7 @@ metadata:
       - references/interrupt-recovery.md
 ---
 
-# SDD Orchestrator v2.0.1 — 严格状态机编排器
+# SDD Orchestrator v2.0.2 — 严格状态机编排器
 
 ## Overview
 
