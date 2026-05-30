@@ -208,3 +208,39 @@ SDD 流程包含 3 个用户门禁和 2 个自动回退闭环。
 - **Given** 项目有特殊约束
 - **When** AGENTS.md 声明 `convention_overrides.disable_rules` 或 `custom_rules`
 - **Then** 编排器在相应时机加载并执行覆盖规则；不影响通用规则的其他项目
+
+
+## R10: 增量交付（Phase 级交付）
+
+### 概述
+支持大型变更分 Phase 独立交付，每 Phase 完成后可验收上线。
+
+### AC10.1 Phase 状态追踪
+- **Given** 增量模式启用
+- **When** 创建 `.sdd-state.json`
+- **Then** 包含 `phase_status` 字段，记录每个 Phase 的 `status`（coding_done/review_passed/qa_passed/accepted）；包含 `sub_phases_completed` 数组；包含 `current_sub_phase` 字段
+
+### AC10.2 Phase 依赖检查
+- **Given** Phase N 开始前
+- **When** 执行门禁检查
+- **Then** 检查 `phase_status[Phase N-1].status == "accepted"`；依赖未满足 → 阻断并提示先完成前一 Phase
+
+### AC10.3 Phase 内嵌套 Review
+- **Given** Phase N Coding 完成
+- **When** 触发 Phase Reviewer
+- **Then** 执行该 Phase 的代码评审；产出合并到主 `review-report.md`（Phase 章节）
+
+### AC10.4 Phase 内嵌套 QA
+- **Given** Phase N Review 通过
+- **When** 触发 Phase QA
+- **Then** 执行该 Phase 的测试（含回归测试）；产出合并到主 `qa-report.md`（Phase 章节）
+
+### AC10.5 Tasks.md Phase 标记
+- **Given** Architect 产出 tasks.md
+- **When** 启用增量模式
+- **Then** 每个 Phase 标题含 `[可独立交付]` 或 `[依赖 Phase X]`；每个 Phase 含交付标准（测试数、AC 覆盖）；每个 Phase 含检查点（Review/QA/用户确认）
+
+### AC10.6 增量模式启用
+- **Given** 用户发起变更
+- **When** 指定 `--incremental` 或 Architect 在 tasks.md 中标记 Phase
+- **Then** Orchestrator 进入增量流程；每 Phase 完成后询问用户是否进入下一 Phase；支持 `--phase=N` 从指定 Phase 恢复

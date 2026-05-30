@@ -81,6 +81,9 @@ AI Agent 编码存在三个系统性缺陷：
 | **基线维护** | `docs/current/` 作为融合后的生产全貌，非变更日志堆砌 | P1 |
 | **Git 工作流** | Feature 分支 + PR（merge 在验收后）+ R10 合规检查 | P1 |
 | **中断恢复** | `.sdd-state.json` 状态持久化，重启后从断点继续 | P1 |
+| **增量交付** | Phase 级独立交付，支持分 Phase 验收和上线 | P1 |
+| **Phase 状态追踪** | `.sdd-state.json` 支持 `phase_status` 记录各 Phase 完成状态 | P2 |
+| **Phase 门禁** | Phase 完成后自动触发 Mini Review/QA | P2 |
 
 ### 3.2 流程级别
 
@@ -89,6 +92,7 @@ AI Agent 编码存在三个系统性缺陷：
 | **Quick** | Bug 修复、配置变更 | Architect 轻量 → Coder → QA 轻量 |
 | **Standard** | 常规功能开发（默认） | PO→BA→Architect→Coder→Reviewer→QA→验收→归档 |
 | **Enhanced** | 安全/性能关键 | Standard + 安全审查 + 性能测试 + 灰度验证 |
+| **Incremental** | 大型重构/多 Phase 交付 | Standard + Phase 级 Review/QA + 分阶段验收 |
 
 ### 3.3 不在范围内
 
@@ -117,6 +121,7 @@ AI Agent 编码存在三个系统性缺陷：
 | 不同 Agent 平台对 Skill 格式兼容性差异 | 纯 Markdown 格式，YAML frontmatter，零平台锁定 |
 | 存量项目升级时丢失自定义配置 | `sdd-upgrade` 先分析后计划，用户确认前不执行任何写操作 |
 | git-workflow 规范本身成为违反对象 | 通过 R10 在归档前强制检查，SDD 项目自身也遵守 |
+| Phase 间耦合比预期高 | Design 阶段强制要求松耦合设计，明确依赖声明 |
 
 ### 5.1 假设
 
@@ -132,3 +137,5 @@ AI Agent 编码存在三个系统性缺陷：
 - 一个存量项目（如 AILP）通过 `sdd-upgrade` 无丢失接入 SDD
 - 3 个不同技术栈的项目（Python/Go/JS）用同一套 Skills 走通完整 SDD 流程
 - README.md 的流程图 + 门禁表能让人 1 分钟理解 SDD 流程
+- 100% 代码变更通过 feature 分支 + PR 流程（R10 合规）
+- Phase 1 独立交付率达到 100%（增量模式）
