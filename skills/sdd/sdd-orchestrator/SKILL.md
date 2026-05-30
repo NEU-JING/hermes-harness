@@ -1,7 +1,7 @@
 ---
 name: sdd-orchestrator
 description: Central workflow orchestrator for SDD. Enforces strict phase gates, manages state machine transitions, and delegates to role agents via delegate_task.
-version: 2.0.1
+version: 2.0.2
 author: Hermes Agent
 license: MIT
 metadata:
@@ -142,7 +142,7 @@ metadata:
 
 ## Agent Delegation（Agent委托）
 
-编排器使用 `delegate_task` 调用各角色Agent。**委托前必须先通过 `skill_view()` 加载对应技能**，避免 agent 跑偏。
+编排器使用 `delegate_task` 调用各角色Agent。**各 agent 负责在内部自主加载自己的 skill**，而不是依赖 orchestrator 预加载。
 
 ### 基础委托格式
 
@@ -178,12 +178,12 @@ delegate_task:
 ### 委托流程
 
 ```python
-# 1. 前置检查：加载对应技能
-skill_info = skill_view(name='po-agent')  # 根据阶段替换
-if not skill_info.success:
-    return DelegateResult(success=False, error="技能加载失败")
+# 1. 检查前置产物（orchestrator 的职责）
+for prereq in prerequisites:
+    if not file_exists(prereq['path']):
+        return DelegateResult(success=False, error="前置产物缺失")
 
-# 2. 执行委托
+# 2. 执行委托（agent 内部自己加载 skill）
 result = delegate_task(
     goal="...",
     context={...},
@@ -296,7 +296,7 @@ def phase_gate_transition(current_state, next_state):
 2. **状态不同步**：每次状态转换必须立即更新 `.sdd-state.json`
 3. **委托上下文不全**：delegate_task的context必须包含完整的前置产物路径
 4. **用户确认缺失**：PO_DONE/BA_DONE/ARCHITECT_DONE/USER_ACCEPT必须等待用户确认
-5. **未加载技能**：委托前必须通过 `skill_view()` 加载对应技能，防止agent跑偏
+5. **Agent 自主加载**：各 agent 负责在内部加载自己的 skill，orchestrator 不预加载
 6. **恢复状态错误**：恢复时要重新检查当前状态产物是否存在，不存在则回退
 7. **增量模式状态复杂**：Phase级状态需要额外维护 sub_phase_status
 
@@ -315,7 +315,6 @@ def phase_gate_transition(current_state, next_state):
 | CLI接口 | 完整实现 | ❌ |
 | **lint检查执行** | 框架（检查文件存在） | ✅ 需调用 `sdd-structure-lint` |
 | **Agent委托** | 框架（打印说明） | ✅ 需调用 `delegate_task` |
-| **技能加载** | 无 | ✅ 需调用 `skill_view()` |
 
 ### 集成方式
 
@@ -328,23 +327,19 @@ python scripts/orchestrator.py start "变更描述"
 **方式2: Hermes集成模式（生产）**
 ```python
 # 在Hermes skill中使用
-from hermes_tools import delegate_task, skill_view
+from hermes_tools import delegate_task
 
 # 调用编排器获取当前状态
 state = orchestrator.load_state(change_id)
 
-# 根据状态委托agent（必须先加载技能）
+# 根据状态委托agent（agent内部自己加载skill）
 if state.current_state == "PO_ENTRY":
-    # 1. 加载技能（防跑偏）
-    skill_info = skill_view(name='po-agent')
-    
-    # 2. 执行委托
     result = delegate_task(
         goal="产出PRD",
         context={...}
     )
     
-    # 3. 完成后推进状态
+    # 完成后推进状态
     orchestrator.transition(change_id, "PO_CHECK")
 ```
 

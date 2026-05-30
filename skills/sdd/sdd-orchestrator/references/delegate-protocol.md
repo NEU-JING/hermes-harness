@@ -1,12 +1,12 @@
 # Agent Delegation Protocol
 
-> **版本**: 2.0.1  
+> **版本**: 2.0.2  
 > **日期**: 2026-05-30
 >
 > **更新内容**:
-> - 新增"前置检查"章节，强制要求委托前调用 `skill_view()`
-> - 新增防跑偏机制，各阶段委托前必须显式加载对应技能
-> - 新增失败处理流程
+> - 前置检查移除 orchestrator 预加载 skill 的要求
+> - 改为 Agent 自主加载模式：各 agent 内部负责加载自己的 skill
+> - 明确职责分离：orchestrator 只管调度，agent 管自己的依赖
 
 ---
 
@@ -62,7 +62,7 @@ delegate_task:
 
 ## 前置检查（Pre-delegation Checks）
 
-**关键原则**：在调用 `delegate_task` 之前，**必须先通过 `skill_view()` 显式加载对应技能**，确保 agent 使用正确的技能上下文，防止跑偏。
+**关键原则**：orchestrator 只负责**委托前环境准备**，**不预加载 agent skill**。各 agent 负责在内部自主加载自己的 skill。
 
 ### 检查清单
 
@@ -70,70 +70,82 @@ delegate_task:
 
 | 检查项 | 命令 | 失败处理 |
 |--------|------|----------|
-| 技能存在性 | `skill_view(name='{agent}-agent')` | 阻断流程，提示安装技能 |
-| 技能可读性 | 验证返回内容非空 | 阻断流程，提示检查技能文件 |
-| 产物目录 | 确保输出目录已创建 | 自动创建目录 |
+| 产物目录 | `os.makedirs(output_dir, exist_ok=True)` | 自动创建目录 |
+| 前置产物 | `file_exists(prerequisites)` | 阻断流程，提示产物缺失 |
+| AGENTS.md | `file_exists("AGENTS.md")` | 警告，使用默认约束 |
 
-### 防跑偏机制
+### 防跑偏机制（Agent 自主加载）
+
+**核心设计**：agent 在被委托后，**内部自主加载自己的 skill**，而不是依赖 orchestrator 预加载。
 
 ```python
-def pre_delegation_check(agent_type: str, change_id: str) -> PreCheckResult:
+# orchestrator：只负责委托，不预加载 skill
+def delegate_to_agent(agent_type: str, change_id: str, context: dict):
     """
-    委托前置检查
-    
-    Args:
-        agent_type: 角色类型 (po/ba/architect/coder/reviewer/qa)
-        change_id: 变更ID
-    
-    Returns:
-        PreCheckResult: 检查结果
+    委托给 agent（orchestrator 只负责调度）
     """
-    skill_name = f"{agent_type}-agent"
+    # 1. 检查前置产物（orchestrator 的职责）
+    for prereq in context.get('prerequisites', []):
+        if not file_exists(prereq['path']):
+            return DelegateResult(
+                success=False,
+                error=f"前置产物缺失: {prereq['path']}",
+                action="检查前置阶段是否已完成"
+            )
     
-    # 1. 显式加载技能（防跑偏关键步骤）
-    skill_info = skill_view(name=skill_name)
-    
-    if not skill_info.success:
-        return PreCheckResult(
-            success=False,
-            error=f"无法加载技能: {skill_name}",
-            action=f"请确认技能已安装: hermes skills 或检查 ~/.hermes/skills/sdd/{skill_name}/",
-            blocking=True
-        )
-    
-    # 2. 验证技能内容
-    if not skill_info.content or len(skill_info.content) < 100:
-        return PreCheckResult(
-            success=False,
-            error=f"技能内容异常: {skill_name}",
-            action="检查SKILL.md文件是否损坏",
-            blocking=True
-        )
-    
-    # 3. 创建输出目录
+    # 2. 创建输出目录
     output_dir = f"docs/changes/{change_id}"
     os.makedirs(output_dir, exist_ok=True)
     
-    return PreCheckResult(success=True, skill_info=skill_info)
+    # 3. 执行委托（不预加载 skill，让 agent 自己处理）
+    result = delegate_task(
+        goal=context['goal'],
+        context=context,
+        toolsets=["file", "terminal", "skills"]
+    )
+    
+    return result
 ```
 
-### 各阶段技能映射
+```python
+# agent 内部：自主加载自己的 skill
+def run(context):
+    """
+    Agent 内部实现示例（以 po-agent 为例）
+    """
+    # 1. 自主加载自己的 skill（防跑偏关键）
+    skill_info = skill_view(name='po-agent')
+    if not skill_info.success:
+        return AgentResult(
+            success=False,
+            error="无法加载 po-agent skill，请检查安装",
+            action="运行: hermes skills"
+        )
+    
+    # 2. 从 skill 获取模板和规范
+    template = skill_info.get_template('templates/prd-template.md')
+    required_sections = skill_info.metadata.get('required_sections', [])
+    
+    # 3. 执行任务
+    ...
+```
 
-| 阶段 | 必须加载的技能 | skill_view() 调用 |
-|------|----------------|-------------------|
+### 各阶段 Agent Skill 映射
+
+| 阶段 | Agent | 内部加载的 Skill |
+|------|-------|------------------|
 | PO | po-agent | `skill_view(name='po-agent')` |
 | BA | ba-agent | `skill_view(name='ba-agent')` |
 | Architect | architect-agent | `skill_view(name='architect-agent')` |
 | Coder | coder-agent | `skill_view(name='coder-agent')` |
 | Reviewer | reviewer-agent | `skill_view(name='reviewer-agent')` |
 | QA | qa-agent | `skill_view(name='qa-agent')` |
-| Lint | sdd-structure-lint | `skill_view(name='sdd-structure-lint')` |
 
 ### 失败处理流程
 
 ```python
-def handle_pre_check_failure(result: PreCheckResult, current_state: str):
-    """前置检查失败处理"""
+def handle_agent_failure(result: AgentResult, current_state: str):
+    """Agent 执行失败处理（包括 skill 加载失败）"""
     
     # 记录失败
     record_failure(
@@ -142,26 +154,32 @@ def handle_pre_check_failure(result: PreCheckResult, current_state: str):
         action=result.action
     )
     
-    # 更新状态文件（BLOCKED）
-    update_sdd_state({
-        "current_state": "BLOCKED",
-        "blocked_reason": result.error,
-        "recovery_action": result.action,
-        "blocked_at": now()
-    })
+    # 检查是否 skill 加载失败
+    if "无法加载" in result.error and "skill" in result.error:
+        update_sdd_state({
+            "current_state": "BLOCKED",
+            "blocked_reason": result.error,
+            "recovery_action": result.action + " 或检查 ~/.hermes/skills/sdd/",
+            "blocked_at": now()
+        })
+        return BlockedResult(
+            output=f"""
+            ❌ Agent 技能加载失败
+            
+            状态: {current_state}
+            错误: {result.error}
+            建议: {result.action}
+            
+            可能原因:
+            1. 技能未安装: hermes skills
+            2. 技能文件损坏: 检查 ~/.hermes/skills/sdd/{current_state.lower()}-agent/
+            
+            修复后说"恢复"继续。
+            """
+        )
     
-    # 输出用户提示
-    output = f"""
-    ❌ 前置检查失败
-    
-    状态: {current_state}
-    错误: {result.error}
-    建议: {result.action}
-    
-    流程已阻断。请修复后说"恢复"继续。
-    """
-    
-    return output
+    # 其他失败处理...
+    return RetryResult(...)
 ```
 
 ---
@@ -169,16 +187,6 @@ def handle_pre_check_failure(result: PreCheckResult, current_state: str):
 ## 各阶段委托详情
 
 ### PO阶段委托
-
-**前置步骤**：必须先加载 po-agent 技能
-```python
-# 1. 显式加载技能（防跑偏）
-skill_info = skill_view(name='po-agent')
-if not skill_info.success:
-    return handle_pre_check_failure(...)
-
-# 2. 执行委托
-```
 
 ```yaml
 delegate_task:
@@ -219,16 +227,6 @@ delegate_task:
 ---
 
 ### BA阶段委托
-
-**前置步骤**：必须先加载 ba-agent 技能
-```python
-# 1. 显式加载技能（防跑偏）
-skill_info = skill_view(name='ba-agent')
-if not skill_info.success:
-    return handle_pre_check_failure(...)
-
-# 2. 执行委托
-```
 
 ```yaml
 delegate_task:
@@ -277,16 +275,6 @@ delegate_task:
 ---
 
 ### Architect阶段委托
-
-**前置步骤**：必须先加载 architect-agent 技能
-```python
-# 1. 显式加载技能（防跑偏）
-skill_info = skill_view(name='architect-agent')
-if not skill_info.success:
-    return handle_pre_check_failure(...)
-
-# 2. 执行委托
-```
 
 ```yaml
 delegate_task:
@@ -338,16 +326,6 @@ delegate_task:
 ### Coder阶段委托
 
 **注意**: Coder阶段是**按Task逐个委托**。
-
-**前置步骤**：必须先加载 coder-agent 技能
-```python
-# 1. 显式加载技能（防跑偏）
-skill_info = skill_view(name='coder-agent')
-if not skill_info.success:
-    return handle_pre_check_failure(...)
-
-# 2. 为每个Task执行委托
-```
 
 ```yaml
 # 为每个Task调用一次
@@ -424,16 +402,6 @@ for task in tasks:
 
 ### Reviewer阶段委托
 
-**前置步骤**：必须先加载 reviewer-agent 技能
-```python
-# 1. 显式加载技能（防跑偏）
-skill_info = skill_view(name='reviewer-agent')
-if not skill_info.success:
-    return handle_pre_check_failure(...)
-
-# 2. 执行委托
-```
-
 ```yaml
 delegate_task:
   goal: "三阶段评审：Spec合规检查、代码质量检查、架构一致性检查"
@@ -503,16 +471,6 @@ delegate_task:
 ---
 
 ### QA阶段委托
-
-**前置步骤**：必须先加载 qa-agent 技能
-```python
-# 1. 显式加载技能（防跑偏）
-skill_info = skill_view(name='qa-agent')
-if not skill_info.success:
-    return handle_pre_check_failure(...)
-
-# 2. 执行委托
-```
 
 ```yaml
 delegate_task:
