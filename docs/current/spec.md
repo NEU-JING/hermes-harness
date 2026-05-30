@@ -244,3 +244,114 @@ SDD 流程包含 3 个用户门禁和 2 个自动回退闭环。
 - **Given** 用户发起变更
 - **When** 指定 `--incremental` 或 Architect 在 tasks.md 中标记 Phase
 - **Then** Orchestrator 进入增量流程；每 Phase 完成后询问用户是否进入下一 Phase；支持 `--phase=N` 从指定 Phase 恢复
+
+---
+
+## R5: 严格状态机（v2.0 新增）
+
+### 概述
+编排器维护 18 状态严格状态机，每个状态有明确的 ENTRY/EXIT 条件。
+
+### AC5.1 状态定义
+- **Given** 状态机定义
+- **When** 检查任意状态
+- **Then** 必含 Entry 条件、Execution、Exit 条件、Transitions
+
+### AC5.2 状态转换
+- **Given** 当前状态完成
+- **When** 检查 Exit 条件 + 执行门禁
+- **Then** 条件满足 → 推进到下一状态；不满足 → 保持当前状态或 BLOCKED
+
+### AC5.3 中断恢复
+- **Given** Agent 重启或流程中断
+- **When** 读取 `.sdd-state.json`
+- **Then** 根据 `current_state` 恢复，产物完整则继续，不完整则回退
+
+---
+
+## R6: 5 级门禁检查（v2.0 新增）
+
+### 概述
+每个状态转换必须通过对应 Level 的 lint 检查。
+
+### AC6.1 L0 初始化检查
+- **Given** IDLE → PO_ENTRY 转换
+- **When** 执行 L0 检查
+- **Then** 目录结构创建成功，状态文件初始化完成
+
+### AC6.2 L1 基础检查
+- **Given** PO/BA 阶段完成
+- **When** 执行 L1 检查
+- **Then** 产物文件存在、非空、格式正确
+
+### AC6.3 L2 设计检查
+- **Given** Architect 阶段完成
+- **When** 执行 L2 检查
+- **Then** Design/Tasks 完整、Task 拆分合理
+
+### AC6.4 L2.5 代码检查
+- **Given** Coder 阶段完成
+- **When** 执行 L2.5 检查
+- **Then** 所有 Task 完成、commits 存在、测试通过
+
+### AC6.5 L3 质量检查
+- **Given** Reviewer/QA 阶段完成
+- **When** 执行 L3 检查
+- **Then** 报告质量合格、AC 覆盖完整
+
+### AC6.6 R10 归档检查
+- **Given** 归档前
+- **When** 执行 R10 检查
+- **Then** PR 已合并、目录结构正确、current/ 已更新
+
+---
+
+## R7: Agent 委托协议（v2.0 新增）
+
+### 概述
+编排器使用 `delegate_task` 调用各角色 Agent。
+
+### AC7.1 委托格式
+- **Given** 任意阶段委托
+- **When** 构建 delegate_task 参数
+- **Then** 必含 goal、context（prerequisites/deliverables/constraints）、toolsets
+
+### AC7.2 前置检查
+- **Given** 委托前
+- **When** orchestrator 执行前置检查
+- **Then** 检查前置产物存在性、创建输出目录（不预加载 skill）
+
+### AC7.3 Agent 自主加载
+- **Given** Agent 被委托
+- **When** Agent 内部执行
+- **Then** 自主调用 `skill_view(name='{agent}-agent')` 加载自己的 skill
+
+---
+
+## R8: Skill 精简与 references 分离（v2.0.1 新增）
+
+### 概述
+SKILL.md 精简为摘要，详细内容移至 references/。
+
+### AC8.1 SKILL.md 行数
+- **Given** 任意角色 Skill
+- **When** 统计 SKILL.md 行数
+- **Then** ≤150 行（不含 references/）
+
+### AC8.2 references 完整性
+- **Given** SKILL.md 声明了 references
+- **When** 通过 `skill_view(name, file_path)` 加载
+- **Then** 文件存在、路径正确、内容完整
+
+### AC8.3 链接有效性
+- **Given** SKILL.md 中的 references 链接
+- **When** 点击或解析
+- **Then** 指向正确的 references/ 文件
+
+---
+
+> **版本更新记录**：
+> - v1.0 (2026-05-25): 初始规格（001-sdd-init）
+> - v2.0 (2026-05-30): 严格状态机、5 级门禁、delegate 协议（006-orchestrator-v2）
+> - v2.0.1 (2026-05-30): Skill 精简、references 分离（007-orchestrator-refine）
+> - v2.0.2 (2026-05-30): Agent 自主加载模式（007-orchestrator-refine 快速修复）

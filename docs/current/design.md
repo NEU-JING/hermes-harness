@@ -356,3 +356,150 @@ Phase N 开始前
 | **Phase 级交付** | 大型重构可早期验证方向，降低返工成本 | 线性瀑布 → 问题发现晚、返工成本高 |
 | **Phase 状态机** | `phase_status` 字段明确追踪各 Phase 生命周期 | 无状态追踪 → 依赖关系混乱 |
 | **Phase 门禁前置** | 开始前检查依赖，防止非法状态推进 | 后置检查 → 发现问题时已执行大量工作 |
+
+---
+
+## 4. 架构演进（v2.0 更新）
+
+### 4.1 严格状态机（006-orchestrator-v2 引入）
+
+**问题**：v1.0 流程描述不清晰，缺乏 ENTRY/EXIT 条件，易偏离。
+
+**解决方案**：18 状态严格状态机
+
+```
+IDLE → PO_ENTRY → PO_CHECK → PO_DONE → BA_ENTRY → BA_CHECK → BA_DONE
+  → ARCHITECT_ENTRY → ARCHITECT_CHECK → ARCHITECT_DONE → CODER_ENTRY
+  → CODER_CHECK → REVIEWER_ENTRY → REVIEWER_CHECK → QA_ENTRY → QA_CHECK
+  → USER_ACCEPT → ARCHIVE_ENTRY → DONE
+```
+
+每个状态定义：
+- **Entry 条件**：进入该状态的前提
+- **Execution**：在该状态执行的操作
+- **Exit 条件**：离开该状态的条件
+- **Transitions**：可能的下一状态
+
+### 4.2 5 级门禁检查（006-orchestrator-v2 引入）
+
+| Level | 触发时机 | 检查内容 |
+|-------|---------|---------|
+| L0 | IDLE → PO_ENTRY | 目录结构初始化 |
+| L1 | PO/BA 阶段 | 文件存在、格式正确 |
+| L2 | Architect 阶段 | Design/Tasks 完整性 |
+| L2.5 | Coder 阶段 | Task 完成、commits 存在 |
+| L3 | Reviewer/QA 阶段 | 报告质量、AC 覆盖 |
+| R10 | 归档前 | PR 合规、基线融合 |
+
+**强制阻断**：不通过则状态保持，返回 BLOCKED。
+
+### 4.3 Agent 委托协议（006-orchestrator-v2 引入）
+
+**基础格式**：
+
+```yaml
+delegate_task:
+  goal: "[明确的目标描述]"
+  context: |
+    change_id: "{change_id}"
+    current_state: "{state}"
+    prerequisites:
+      - "{prereq1_path}"
+    deliverables:
+      - file: "{output_path}"
+  toolsets: ["file", "terminal", "skills"]
+  role: "leaf"
+```
+
+**各阶段委托**：
+- PO: `skill_view(name='po-agent')` → 产出 prd.md
+- BA: `skill_view(name='ba-agent')` → 产出 spec.md
+- Architect: `skill_view(name='architect-agent')` → 产出 design.md + tasks.md
+- Coder: `skill_view(name='coder-agent')` → TDD 实现
+- Reviewer: `skill_view(name='reviewer-agent')` → 产出 review-report.md
+- QA: `skill_view(name='qa-agent')` → 产出 qa-report.md
+
+### 4.4 Agent 自主加载模式（007-v2.0.2 更新）
+
+**问题**：orchestrator 预加载 skill 是重复工作，职责不清。
+
+**解决方案**：orchestrator 只负责调度，**Agent 内部自主加载自己的 skill**。
+
+```python
+# orchestrator：只负责委托，不预加载 skill
+def delegate_to_agent(agent_type, change_id, context):
+    # 1. 检查前置产物（orchestrator 的职责）
+    for prereq in context['prerequisites']:
+        if not file_exists(prereq['path']):
+            return DelegateResult(success=False, error="前置产物缺失")
+    
+    # 2. 创建输出目录
+    os.makedirs(f"docs/changes/{change_id}", exist_ok=True)
+    
+    # 3. 执行委托（agent 内部自己加载 skill）
+    return delegate_task(goal=context['goal'], context=context)
+
+# agent 内部：自主加载自己的 skill
+def run(context):
+    # 1. 自主加载自己的 skill（防跑偏关键）
+    skill_info = skill_view(name='po-agent')  # 各 agent 加载自己
+    if not skill_info.success:
+        return AgentResult(success=False, error="无法加载 skill")
+    
+    # 2. 从 skill 获取模板和规范
+    template = skill_info.get_template('templates/prd-template.md')
+    
+    # 3. 执行任务
+    ...
+```
+
+**优点**：
+- 职责清晰：orchestrator 只管调度，agent 管自己的依赖
+- 自包含：agent 可被其他方式复用
+- 避免重复：orchestrator 预加载 + agent 内部加载的重复
+
+---
+
+## 5. 关键技术决策
+
+### T1: 状态机驱动 vs 口头描述
+
+**选择**：严格状态机（18 状态 + ENTRY/EXIT 条件）
+
+**理由**：
+- 消除模糊性，每个状态有明确判断标准
+- 自动推进，减少人为判断
+- 支持中断恢复（状态持久化）
+
+### T2: 强制门禁 vs 建议性检查
+
+**选择**：强制阻断（L0-L3 + R10）
+
+**理由**：
+- 质量门禁不能妥协
+- 早发现早修复，避免问题累积
+
+### T3: Agent 自主加载 vs Orchestrator 预加载
+
+**选择**：Agent 自主加载
+
+**理由**：
+- 单一职责原则
+- agent 自包含，可复用
+- 避免重复加载
+
+### T4: SKILL.md 精简 vs 完整描述
+
+**选择**：SKILL.md 摘要 + references/ 详细定义
+
+**理由**：
+- 减少 token 消耗
+- 单点维护，避免不一致
+- 按需加载详细内容
+
+---
+
+> **版本更新记录**：
+> - v1.0 (2026-05-25): 初始设计（001-sdd-init）
+> - v2.0 (2026-05-30): 严格状态机、5 级门禁、delegate 协议（006-orchestrator-v2）
+> - v2.0.2 (2026-05-30): Agent 自主加载模式（007-orchestrator-refine）
