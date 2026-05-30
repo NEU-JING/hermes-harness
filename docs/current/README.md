@@ -12,7 +12,7 @@
 - **增量交付**：支持（新增 Phase 级独立交付）
 - **角色 Skill**：8 个（po-agent, ba-agent, architect-agent, coder-agent, reviewer-agent, qa-agent, sdd-orchestrator, sdd-init）
 - **辅助 Skill**：1 个（sdd-structure-lint）
-- **已归档变更**：5（001-sdd-init, 002-project-onboarding, 003-git-and-docs, 004-incremental-delivery, 005-harness-generalization）
+- **已归档变更**：7（001-007）
 - **通用化状态**：✅ 已完成（移除 AILP 特定引用，所有 references 文件已在 SKILL.md frontmatter 中声明）
 
 ---
@@ -86,6 +86,7 @@ Hermes Agent
 | 004-incremental-delivery | SDD 增量交付支持 | State Schema + Orchestrator 增量模式 + Phase Review/QA + Tasks Phase 标记 | 2026-05-30 |
 | 005-harness-generalization | SDD 技能包通用化 | 7 个 AILP 引用文件通用化 + 9 个 SKILL.md frontmatter references 完整性 | 2026-05-30 |
 | 006-orchestrator-v2 | SDD Orchestrator v2.0 重构 | SKILL.md重写 + 6 references + orchestrator.py 可执行脚本 | 2026-05-30 |
+| 007-orchestrator-refine | SDD Orchestrator v2.0.1 优化 | SKILL.md精简(-29%) + delegate-protocol新增前置检查(skill_view强制) | 2026-05-30 |
 
 ---
 
