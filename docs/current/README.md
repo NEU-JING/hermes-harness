@@ -87,6 +87,7 @@ Hermes Agent
 | 005-harness-generalization | SDD 技能包通用化 | 7 个 AILP 引用文件通用化 + 9 个 SKILL.md frontmatter references 完整性 | 2026-05-30 |
 | 006-orchestrator-v2 | SDD Orchestrator v2.0 重构 | SKILL.md重写 + 6 references + orchestrator.py 可执行脚本 | 2026-05-30 |
 | 007-orchestrator-refine | SDD Orchestrator v2.0.1 优化 | SKILL.md精简(-29%) + delegate-protocol新增前置检查(skill_view强制) | 2026-05-30 |
+| 007-orchestrator-refine-v2.0.2 | SDD Orchestrator v2.0.2 快速修复 | 改为 Agent 自主加载模式（orchestrator 不预加载 skill） | 2026-05-30 |
 
 ---
 
