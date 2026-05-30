@@ -1,7 +1,7 @@
 ---
 name: sdd-orchestrator
 description: Central workflow orchestrator for SDD. Enforces strict phase gates, manages state machine transitions, and delegates to role agents via delegate_task.
-version: 2.0.0
+version: 2.0.1
 author: Hermes Agent
 license: MIT
 metadata:
@@ -16,7 +16,7 @@ metadata:
       - references/interrupt-recovery.md
 ---
 
-# SDD Orchestrator v2.0 — 严格状态机编排器
+# SDD Orchestrator v2.0.1 — 严格状态机编排器
 
 ## Overview
 
@@ -86,7 +86,7 @@ metadata:
 [tests run]        [qa-report.md]         [user says "归档"]
 ```
 
-### 状态定义
+### 状态定义摘要
 
 | 状态 | 类型 | 说明 | 产物检查 |
 |------|:---:|:---|:---|
@@ -110,17 +110,6 @@ metadata:
 | `ARCHIVE_ENTRY` | 执行 | 归档执行中 | 用户确认 |
 | `DONE` | 终止 | 流程完成 | 归档完成 |
 | `BLOCKED` | 终止 | 流程阻断 | 需人工介入 |
-
----
-
-## State Transition（状态转换）
-
-### 转换规则
-
-每个状态转换必须满足：
-1. **前置条件**：当前状态的产物检查通过
-2. **Lint检查**：调用 `sdd-structure-lint` 对应Level
-3. **用户确认**（可选）：特定状态需要用户明确输入
 
 ### 转换矩阵
 
@@ -147,13 +136,15 @@ metadata:
 | `USER_ACCEPT` | 用户说"归档" | `ARCHIVE_ENTRY` | — | ✅ |
 | `ARCHIVE_ENTRY` | 归档完成 | `DONE` | R10+L3 | ❌ |
 
+> **详细状态定义**见 [state-machine.md](./references/state-machine.md)
+
 ---
 
 ## Agent Delegation（Agent委托）
 
-编排器使用 `delegate_task` 调用各角色Agent。
+编排器使用 `delegate_task` 调用各角色Agent。**委托前必须先通过 `skill_view()` 加载对应技能**，避免 agent 跑偏。
 
-### 委托协议
+### 基础委托格式
 
 ```yaml
 delegate_task:
@@ -184,175 +175,35 @@ delegate_task:
   role: "leaf"
 ```
 
-### 各阶段委托规范
+### 委托流程
 
-#### PO阶段委托
+```python
+# 1. 前置检查：加载对应技能
+skill_info = skill_view(name='po-agent')  # 根据阶段替换
+if not skill_info.success:
+    return DelegateResult(success=False, error="技能加载失败")
 
-```yaml
-goal: "根据变更描述产出PRD文档，明确目标、用户、功能范围、非目标、成功指标"
-context: |
-  change_id: "{change_id}"
-  description: "{user_input_description}"
-  phase: "po"
-  output: "docs/changes/{change_id}/prd.md"
-  
-  # PRD必须包含的章节
-  required_sections:
-    - "背景与目标"
-    - "目标用户"
-    - "功能范围（功能表）"
-    - "非目标"
-    - "成功指标"
-    - "用户场景"
+# 2. 执行委托
+result = delegate_task(
+    goal="...",
+    context={...},
+    toolsets=["file", "terminal", "skills"]
+)
 
-deliverables:
-  - file: "docs/changes/{change_id}/prd.md"
-    template: "po-agent/templates/prd-template.md"
+# 3. 处理结果
+if result.success:
+    update_state_json({"state": next_state})
+else:
+    handle_delegate_failure(result)
 ```
 
-#### BA阶段委托
-
-```yaml
-goal: "根据PRD产出Spec文档，细化需求并编写AC（Given-When-Then）"
-context: |
-  change_id: "{change_id}"
-  prd_path: "docs/changes/{change_id}/prd.md"
-  phase: "ba"
-  output: "docs/changes/{change_id}/spec.md"
-  
-  # Spec必须包含的章节
-  required_sections:
-    - "需求清单（R1-RN，对应PRD功能）"
-    - "每个需求的AC（Given-When-Then）"
-    - "边界情况"
-    - "数据契约"
-
-deliverables:
-  - file: "docs/changes/{change_id}/spec.md"
-    template: "ba-agent/templates/spec-template.md"
-```
-
-#### Architect阶段委托
-
-```yaml
-goal: "根据Spec产出Design文档和Tasks拆分"
-context: |
-  change_id: "{change_id}"
-  spec_path: "docs/changes/{change_id}/spec.md"
-  phase: "architect"
-  outputs:
-    - "docs/changes/{change_id}/design.md"
-    - "docs/changes/{change_id}/tasks.md"
-  
-  # Design必须包含的章节
-  required_sections:
-    - "架构决策"
-    - "数据流/时序图"
-    - "接口定义"
-    - "产出物清单"
-  
-  # Tasks必须包含的章节
-  task_requirements:
-    - "按业务场景拆分的Task列表"
-    - "每个Task可独立部署"
-    - "Task间依赖关系"
-    - "Phase标记（增量模式）"
-
-deliverables:
-  - file: "docs/changes/{change_id}/design.md"
-    template: "architect-agent/templates/design-template.md"
-  - file: "docs/changes/{change_id}/tasks.md"
-    template: "architect-agent/templates/tasks-template.md"
-```
-
-#### Coder阶段委托
-
-```yaml
-goal: "按Tasks逐步实现代码，每个Task遵循TDD"
-context: |
-  change_id: "{change_id}"
-  tasks_path: "docs/changes/{change_id}/tasks.md"
-  design_path: "docs/changes/{change_id}/design.md"
-  phase: "coder"
-  
-  # TDD要求
-  tdd_requirements:
-    - "每个Task必须先写测试（RED）"
-    - "实现代码使测试通过（GREEN）"
-    - "重构（REFACTOR）"
-    - "提交commit"
-  
-  # 代码约束（来自AGENTS.md）
-  code_constraints: "{from AGENTS.md conventions}"
-
-deliverables:
-  - type: "commits"
-    branch: "feat/{change_id}"
-  - file: "docs/changes/{change_id}/completion-report.md"
-    template: "coder-agent/templates/task-completion-report.md"
-```
-
-#### Reviewer阶段委托
-
-```yaml
-goal: "评审代码实现，检查Spec合规、代码质量、架构一致性"
-context: |
-  change_id: "{change_id}"
-  spec_path: "docs/changes/{change_id}/spec.md"
-  design_path: "docs/changes/{change_id}/design.md"
-  completion_report: "docs/changes/{change_id}/completion-report.md"
-  phase: "reviewer"
-  
-  # 三阶段评审
-  review_phases:
-    - "Phase 1: Spec合规（AC覆盖检查）"
-    - "Phase 2: 代码质量（DRY/YAGNI/命名/错误处理）"
-    - "Phase 3: 架构一致性（模块/接口/数据流）"
-  
-  # 严重级别
-  severity_levels: ["CRITICAL", "MAJOR", "MINOR", "INFO"]
-
-deliverables:
-  - file: "docs/changes/{change_id}/review-report.md"
-    template: "reviewer-agent/templates/review-report.md"
-    required_sections:
-      - "评审结论（通过/有条件通过/不通过）"
-      - "问题清单（严重级别排序）"
-      - "修复建议"
-```
-
-#### QA阶段委托
-
-```yaml
-goal: "验证AC覆盖，执行测试，产出QA报告"
-context: |
-  change_id: "{change_id}"
-  spec_path: "docs/changes/{change_id}/spec.md"
-  review_report: "docs/changes/{change_id}/review-report.md"
-  phase: "qa"
-  
-  # QA检查
-  qa_checks:
-    - "AC覆盖矩阵（每个AC有测试）"
-    - "测试执行（单元/集成/E2E）"
-    - "环境差异检查"
-    - "熔断检查（连续失败）"
-
-deliverables:
-  - file: "docs/changes/{change_id}/qa-report.md"
-    template: "qa-agent/templates/qa-report.md"
-    required_sections:
-      - "AC覆盖矩阵"
-      - "测试结果统计"
-      - "环境差异说明"
-      - "结论（通过/不通过）"
-```
+> **各阶段详细委托规范**见 [delegate-protocol.md](./references/delegate-protocol.md)
 
 ---
 
 ## Phase Gates（阶段门禁）
 
-每个状态转换必须通过的检查。
+每个状态转换必须通过对应Level的lint检查。
 
 ### Lint Level 映射
 
@@ -386,15 +237,11 @@ def phase_gate_transition(current_state, next_state):
     if not result.passed:
         # 阻断：不转换状态，返回错误报告
         update_state_json({
-            "state": current_state,  # 保持原状态
+            "state": current_state,
             "blocked_reason": result.errors,
             "last_check": "failed"
         })
-        return PhaseGateResult(
-            success=False,
-            errors=result.errors,
-            next_state=None  # 不推进
-        )
+        return PhaseGateResult(success=False, errors=result.errors)
     
     # 3. 通过：更新状态并推进
     update_state_json({
@@ -405,6 +252,8 @@ def phase_gate_transition(current_state, next_state):
     
     return PhaseGateResult(success=True, next_state=next_state)
 ```
+
+> **详细门禁检查规范**见 [phase-gates.md](./references/phase-gates.md)
 
 ---
 
@@ -420,13 +269,12 @@ def phase_gate_transition(current_state, next_state):
 2. 创建 changes/006-user-login/ 目录
 3. 初始化 .sdd-state.json: { state: "IDLE", ... }
 4. 状态转换：IDLE → PO_ENTRY
-5. 调用 delegate_task 委托 po-agent
-   - goal: "产出PRD文档..."
-   - context: { change_id: "006-user-login", description: "用户登录功能" }
-6. 等待po-agent完成
-7. 状态转换：PO_ENTRY → PO_CHECK（执行L1 lint）
-8. lint通过 → PO_DONE
-9. 等待用户确认...
+5. 调用 skill_view(name='po-agent') 加载技能
+6. 调用 delegate_task 委托 po-agent
+7. 等待po-agent完成
+8. 状态转换：PO_ENTRY → PO_CHECK（执行L1 lint）
+9. lint通过 → PO_DONE
+10. 等待用户确认...
 ```
 
 ### 用户确认指令
@@ -440,19 +288,6 @@ def phase_gate_transition(current_state, next_state):
 | 任意等待状态 | "状态" | 输出当前状态和产物 |
 | 任意状态 | "中断" | 保存状态，可恢复 |
 
-### 恢复中断
-
-```
-用户：恢复SDD流程
-
-编排器：
-1. 读取 .sdd-state.json
-2. 检测 current_state
-3. 若 state 为 EXECUTING 状态 → 重新委托对应agent
-4. 若 state 为 WAITING 状态 → 等待用户指令
-5. 若 state 为 BLOCKED → 显示阻断原因
-```
-
 ---
 
 ## Common Pitfalls
@@ -461,8 +296,9 @@ def phase_gate_transition(current_state, next_state):
 2. **状态不同步**：每次状态转换必须立即更新 `.sdd-state.json`
 3. **委托上下文不全**：delegate_task的context必须包含完整的前置产物路径
 4. **用户确认缺失**：PO_DONE/BA_DONE/ARCHITECT_DONE/USER_ACCEPT必须等待用户确认
-5. **恢复状态错误**：恢复时要重新检查当前状态产物是否存在，不存在则回退
-6. **增量模式状态复杂**：Phase级状态需要额外维护 sub_phase_status
+5. **未加载技能**：委托前必须通过 `skill_view()` 加载对应技能，防止agent跑偏
+6. **恢复状态错误**：恢复时要重新检查当前状态产物是否存在，不存在则回退
+7. **增量模式状态复杂**：Phase级状态需要额外维护 sub_phase_status
 
 ---
 
@@ -479,6 +315,7 @@ def phase_gate_transition(current_state, next_state):
 | CLI接口 | 完整实现 | ❌ |
 | **lint检查执行** | 框架（检查文件存在） | ✅ 需调用 `sdd-structure-lint` |
 | **Agent委托** | 框架（打印说明） | ✅ 需调用 `delegate_task` |
+| **技能加载** | 无 | ✅ 需调用 `skill_view()` |
 
 ### 集成方式
 
@@ -491,19 +328,23 @@ python scripts/orchestrator.py start "变更描述"
 **方式2: Hermes集成模式（生产）**
 ```python
 # 在Hermes skill中使用
-from hermes_tools import delegate_task
+from hermes_tools import delegate_task, skill_view
 
 # 调用编排器获取当前状态
 state = orchestrator.load_state(change_id)
 
-# 根据状态委托agent
+# 根据状态委托agent（必须先加载技能）
 if state.current_state == "PO_ENTRY":
+    # 1. 加载技能（防跑偏）
+    skill_info = skill_view(name='po-agent')
+    
+    # 2. 执行委托
     result = delegate_task(
         goal="产出PRD",
-        skill="po-agent",
         context={...}
     )
-    # 完成后推进状态
+    
+    # 3. 完成后推进状态
     orchestrator.transition(change_id, "PO_CHECK")
 ```
 
@@ -526,6 +367,6 @@ def execute_lint(self, level: str, change_id: str):
 
 - [state-machine.md](./references/state-machine.md) — 完整状态机定义
 - [phase-gates.md](./references/phase-gates.md) — 门禁检查详细规范
-- [delegate-protocol.md](./references/delegate-protocol.md) — Agent委托协议
+- [delegate-protocol.md](./references/delegate-protocol.md) — Agent委托协议（含 skill_view() 要求）
 - [incremental-mode.md](./references/incremental-mode.md) — 增量交付模式
 - [interrupt-recovery.md](./references/interrupt-recovery.md) — 中断恢复机制

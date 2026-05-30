@@ -1,7 +1,12 @@
 # Agent Delegation Protocol
 
-> **版本**: 2.0  
+> **版本**: 2.0.1  
 > **日期**: 2026-05-30
+>
+> **更新内容**:
+> - 新增"前置检查"章节，强制要求委托前调用 `skill_view()`
+> - 新增防跑偏机制，各阶段委托前必须显式加载对应技能
+> - 新增失败处理流程
 
 ---
 
@@ -55,9 +60,125 @@ delegate_task:
 
 ---
 
+## 前置检查（Pre-delegation Checks）
+
+**关键原则**：在调用 `delegate_task` 之前，**必须先通过 `skill_view()` 显式加载对应技能**，确保 agent 使用正确的技能上下文，防止跑偏。
+
+### 检查清单
+
+编排器在委托前必须执行以下检查：
+
+| 检查项 | 命令 | 失败处理 |
+|--------|------|----------|
+| 技能存在性 | `skill_view(name='{agent}-agent')` | 阻断流程，提示安装技能 |
+| 技能可读性 | 验证返回内容非空 | 阻断流程，提示检查技能文件 |
+| 产物目录 | 确保输出目录已创建 | 自动创建目录 |
+
+### 防跑偏机制
+
+```python
+def pre_delegation_check(agent_type: str, change_id: str) -> PreCheckResult:
+    """
+    委托前置检查
+    
+    Args:
+        agent_type: 角色类型 (po/ba/architect/coder/reviewer/qa)
+        change_id: 变更ID
+    
+    Returns:
+        PreCheckResult: 检查结果
+    """
+    skill_name = f"{agent_type}-agent"
+    
+    # 1. 显式加载技能（防跑偏关键步骤）
+    skill_info = skill_view(name=skill_name)
+    
+    if not skill_info.success:
+        return PreCheckResult(
+            success=False,
+            error=f"无法加载技能: {skill_name}",
+            action=f"请确认技能已安装: hermes skills 或检查 ~/.hermes/skills/sdd/{skill_name}/",
+            blocking=True
+        )
+    
+    # 2. 验证技能内容
+    if not skill_info.content or len(skill_info.content) < 100:
+        return PreCheckResult(
+            success=False,
+            error=f"技能内容异常: {skill_name}",
+            action="检查SKILL.md文件是否损坏",
+            blocking=True
+        )
+    
+    # 3. 创建输出目录
+    output_dir = f"docs/changes/{change_id}"
+    os.makedirs(output_dir, exist_ok=True)
+    
+    return PreCheckResult(success=True, skill_info=skill_info)
+```
+
+### 各阶段技能映射
+
+| 阶段 | 必须加载的技能 | skill_view() 调用 |
+|------|----------------|-------------------|
+| PO | po-agent | `skill_view(name='po-agent')` |
+| BA | ba-agent | `skill_view(name='ba-agent')` |
+| Architect | architect-agent | `skill_view(name='architect-agent')` |
+| Coder | coder-agent | `skill_view(name='coder-agent')` |
+| Reviewer | reviewer-agent | `skill_view(name='reviewer-agent')` |
+| QA | qa-agent | `skill_view(name='qa-agent')` |
+| Lint | sdd-structure-lint | `skill_view(name='sdd-structure-lint')` |
+
+### 失败处理流程
+
+```python
+def handle_pre_check_failure(result: PreCheckResult, current_state: str):
+    """前置检查失败处理"""
+    
+    # 记录失败
+    record_failure(
+        state=current_state,
+        error=result.error,
+        action=result.action
+    )
+    
+    # 更新状态文件（BLOCKED）
+    update_sdd_state({
+        "current_state": "BLOCKED",
+        "blocked_reason": result.error,
+        "recovery_action": result.action,
+        "blocked_at": now()
+    })
+    
+    # 输出用户提示
+    output = f"""
+    ❌ 前置检查失败
+    
+    状态: {current_state}
+    错误: {result.error}
+    建议: {result.action}
+    
+    流程已阻断。请修复后说"恢复"继续。
+    """
+    
+    return output
+```
+
+---
+
 ## 各阶段委托详情
 
 ### PO阶段委托
+
+**前置步骤**：必须先加载 po-agent 技能
+```python
+# 1. 显式加载技能（防跑偏）
+skill_info = skill_view(name='po-agent')
+if not skill_info.success:
+    return handle_pre_check_failure(...)
+
+# 2. 执行委托
+```
 
 ```yaml
 delegate_task:
@@ -98,6 +219,16 @@ delegate_task:
 ---
 
 ### BA阶段委托
+
+**前置步骤**：必须先加载 ba-agent 技能
+```python
+# 1. 显式加载技能（防跑偏）
+skill_info = skill_view(name='ba-agent')
+if not skill_info.success:
+    return handle_pre_check_failure(...)
+
+# 2. 执行委托
+```
 
 ```yaml
 delegate_task:
@@ -146,6 +277,16 @@ delegate_task:
 ---
 
 ### Architect阶段委托
+
+**前置步骤**：必须先加载 architect-agent 技能
+```python
+# 1. 显式加载技能（防跑偏）
+skill_info = skill_view(name='architect-agent')
+if not skill_info.success:
+    return handle_pre_check_failure(...)
+
+# 2. 执行委托
+```
 
 ```yaml
 delegate_task:
@@ -197,6 +338,16 @@ delegate_task:
 ### Coder阶段委托
 
 **注意**: Coder阶段是**按Task逐个委托**。
+
+**前置步骤**：必须先加载 coder-agent 技能
+```python
+# 1. 显式加载技能（防跑偏）
+skill_info = skill_view(name='coder-agent')
+if not skill_info.success:
+    return handle_pre_check_failure(...)
+
+# 2. 为每个Task执行委托
+```
 
 ```yaml
 # 为每个Task调用一次
@@ -273,6 +424,16 @@ for task in tasks:
 
 ### Reviewer阶段委托
 
+**前置步骤**：必须先加载 reviewer-agent 技能
+```python
+# 1. 显式加载技能（防跑偏）
+skill_info = skill_view(name='reviewer-agent')
+if not skill_info.success:
+    return handle_pre_check_failure(...)
+
+# 2. 执行委托
+```
+
 ```yaml
 delegate_task:
   goal: "三阶段评审：Spec合规检查、代码质量检查、架构一致性检查"
@@ -342,6 +503,16 @@ delegate_task:
 ---
 
 ### QA阶段委托
+
+**前置步骤**：必须先加载 qa-agent 技能
+```python
+# 1. 显式加载技能（防跑偏）
+skill_info = skill_view(name='qa-agent')
+if not skill_info.success:
+    return handle_pre_check_failure(...)
+
+# 2. 执行委托
+```
 
 ```yaml
 delegate_task:
