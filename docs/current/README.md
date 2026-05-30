@@ -95,3 +95,8 @@ Hermes Agent
 | [prd.md](prd.md) | 产品需求文档 — 目标、用户、功能范围、成功指标 |
 | [spec.md](spec.md) | 规格说明 — 9 大需求、30+ AC、Given-When-Then 格式 |
 | [design.md](design.md) | 技术设计 — 三层架构、文件格式、数据流、关键决策 |
+
+> **注意**：`tasks.md` 不纳入 current/ 基线
+>
+> 原因：Tasks 是每次变更的**执行计划**，随变更完成即失效，无长期维护价值。
+> 如需查看历史 Tasks，请查阅 `docs/archive/{变更ID}/tasks.md`。
