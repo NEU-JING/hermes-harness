@@ -1,299 +1,260 @@
 # 增量交付模式（Incremental Delivery Mode）
 
-> **版本**: 1.0  
-> **日期**: 2026-05-30
+> **版本**: 2.0  
+> **日期**: 2026-05-30  
+> **对应状态机**: state-machine.md
 
 ---
 
-## 什么是增量交付模式？
+## 概述
 
-增量交付模式是 SDD 流程的一种变体，允许大型变更按 **Phase（阶段）** 拆分，每个 Phase 独立经历 Review → QA → 验收，验证通过后再进入下一 Phase。
+增量交付模式是 SDD 流程的扩展，允许大型变更按 **Phase（阶段）** 拆分，每个 Phase 独立经历 Review → QA → 验收。
 
-```
-传统线性模式：
-Design → All Coding → Review → QA → 验收 → 归档
-              ↓
-        问题发现晚，返工成本高
-
-增量交付模式：
-Phase 1 → Review → QA → 验收 → (可独立上线)
-   ↓
-Phase 2 → Review → QA → 验收 → (可独立上线)
-   ↓
-Phase 3 → Review → QA → 验收 → 归档
-```
+**与状态机的关系**: 增量模式在 Standard 状态机基础上，扩展了 `CODER_ENTRY` / `REVIEWER_ENTRY` / `QA_ENTRY` 阶段的子状态。
 
 ---
 
-## 适用场景
+## 启用条件
 
-| 场景 | 说明 |
+| 条件 | 说明 |
 |------|------|
-| 大型系统重构 | 分阶段验证架构方向，降低风险 |
-| 多模块并行开发 | 某模块延期不影响其他模块交付 |
-| 快速验证核心功能 | 先交付 MVP，再逐步增强 |
-| 需求不确定性高 | 早期交付获取反馈，及时调整 |
+| 用户指定 | "用增量SDD流程做xxx" |
+| Architect指定 | tasks.md 中有 Phase 标记 |
+| 自动判定 | 变更涉及 3+ 模块，估时 > 2 周 |
+
+---
+
+## 增量模式状态机扩展
+
+### 标准状态 vs 增量模式状态
+
+```
+Standard流程:
+CODER_ENTRY → CODER_CHECK → REVIEWER_ENTRY → REVIEWER_CHECK → QA_ENTRY → QA_CHECK
+
+增量模式流程:
+CODER_ENTRY(Phase1) → CODER_CHECK(Phase1) → REVIEWER_ENTRY(Phase1) → REVIEWER_CHECK(Phase1)
+                                                            ↓ (QA通过后)
+                                          CODER_ENTRY(Phase2) → CODER_CHECK(Phase2) → ...
+                                                            ↓
+                                          CODER_ENTRY(Phase3) → ...
+                                                            ↓
+                                          USER_ACCEPT → ARCHIVE_ENTRY
+```
+
+### 增量模式专用状态
+
+| 状态 | 类型 | 说明 |
+|------|:---:|:---|
+| `PHASE_N_CODER` | EXECUTING | Phase N 编码中 |
+| `PHASE_N_CHECK` | GATE | Phase N 门禁检查 |
+| `PHASE_N_REVIEW` | EXECUTING | Phase N 评审中 |
+| `PHASE_N_QA` | EXECUTING | Phase N QA中 |
+| `PHASE_N_DONE` | WAITING | Phase N 完成，等待进入下一Phase |
+
+---
+
+## .sdd-state.json 增量模式扩展
+
+```json
+{
+  "change_id": "006-refactoring",
+  "flow_level": "Standard",
+  "current_state": "PHASE_2_CODER",
+  "incremental_mode": true,
+  
+  "phase_config": {
+    "total_phases": 3,
+    "current_phase": "phase_2",
+    "phases": {
+      "phase_1": {
+        "name": "数据层重构",
+        "status": "accepted",
+        "tasks": ["T1", "T2", "T3"],
+        "ac_covered": ["AC1-AC8"],
+        "completed_at": "2026-05-28T10:00:00Z"
+      },
+      "phase_2": {
+        "name": "服务层重构",
+        "status": "in_progress",
+        "tasks": ["T4", "T5", "T6"],
+        "ac_covered": ["AC9-AC15"],
+        "depends_on": ["phase_1"]
+      },
+      "phase_3": {
+        "name": "API层重构",
+        "status": "not_started",
+        "tasks": ["T7", "T8"],
+        "ac_covered": ["AC16-AC20"],
+        "depends_on": ["phase_1", "phase_2"]
+      }
+    }
+  },
+  
+  "state_history": [...],
+  "started_at": "2026-05-25T08:00:00Z",
+  "updated_at": "2026-05-30T10:00:00Z"
+}
+```
 
 ---
 
 ## Phase 生命周期
 
-### 状态机
+### Phase 状态流转
 
 ```
                     ┌─────────────────────────────────────┐
                     │                                     │
                     ▼                                     │
 ┌──────────┐    ┌──────────┐    ┌──────────┐    ┌────────┴───┐
-│  NOT_    │───▶│   IN_    │───▶│ CODING_  │───▶│  REVIEW_   │
-│ STARTED  │    │ PROGRESS │    │   DONE   │    │   PASSED   │
+│  NOT_    │───▶│ PHASE_N_ │───▶│ PHASE_N_ │───▶│ PHASE_N_   │
+│ STARTED  │    │  CODER   │    │  CHECK   │    │  REVIEW    │
 └──────────┘    └──────────┘    └────┬─────┘    └─────┬──────┘
                                      │                │
                                      │         ┌──────┴──────┐
                                      │         ▼             │
                                      │    ┌──────────┐       │
-                                     │    │ REVIEW_  │───────┘
-                                     │    │ FAILED   │
-                                     │    └──────────┘
-                                     │
-                                     ▼
-                              ┌──────────┐
-                              │   QA_    │
-                              │  PASSED  │
-                              └────┬─────┘
+                                     │    │PHASE_N_QA│       │
+                                     │    └────┬─────┘       │
+                                     │         │             │
+                                     ▼         ▼             │
+                              ┌──────────┐   ┌──────────┐   │
+                              │PHASE_N_  │   │ NEXT     │───┘
+                              │ ACCEPTED │   │ PHASE    │
+                              └────┬─────┘   └──────────┘
                                    │
-                    ┌──────────────┼──────────────┐
-                    │              │              │
-                    ▼              ▼              ▼
-              ┌──────────┐   ┌──────────┐   ┌──────────┐
-              │   QA_    │   │ ACCEPTED │   │  NEXT    │
-              │  FAILED  │   │          │   │  PHASE   │
-              └──────────┘   └──────────┘   └──────────┘
+                                   ▼
+                            ┌──────────┐
+                            │ USER_    │
+                            │ ACCEPT   │
+                            └──────────┘
 ```
 
-### 状态说明
+### Phase 状态定义
 
-| 状态 | 说明 | 可进入下一 Phase？ |
-|------|------|:------------------:|
+| 状态 | 说明 | 可进入下一Phase？ |
+|------|------|:-----------------:|
 | `not_started` | 未开始 | ❌ |
-| `in_progress` | 进行中（Coding） | ❌ |
-| `coding_done` | Coding 完成，待 Review | ❌ |
-| `review_failed` | Review 不通过 | ❌（返回 Coder） |
-| `review_passed` | Review 通过，待 QA | ❌ |
-| `qa_failed` | QA 不通过 | ❌（返回 Coder） |
-| `qa_passed` | QA 通过（可交付） | ✅（需用户确认） |
-| `accepted` | 用户验收通过 | ✅ |
+| `in_progress` | 编码中 | ❌ |
+| `coding_done` | 编码完成 | ❌ |
+| `review_failed` | 评审失败 | ❌（返回Coder） |
+| `review_passed` | 评审通过 | ❌ |
+| `qa_failed` | QA失败 | ❌（返回Coder） |
+| `qa_passed` | QA通过 | ✅（需用户确认） |
+| `accepted` | 用户验收 | ✅ |
 
 ---
 
-## 启用增量模式
+## 增量模式委托规范
 
-### 方式 1：用户明确指定
+### Coder阶段委托（按Phase）
 
+```yaml
+delegate_task:
+  goal: "实现 Phase {N} 的所有Tasks"
+  
+  context: |
+    change_id: "{change_id}"
+    phase_id: "phase_{N}"
+    phase_name: "{phase_name}"
+    
+    ## 前置检查
+    preconditions:
+      - "依赖Phase已完成: {depends_on}"
+    
+    ## 当前Phase的Tasks
+    tasks:
+      - "T4: 重构用户服务"
+      - "T5: 重构订单服务"
+      - "T6: 添加服务测试"
+    
+    ## 产出
+    deliverables:
+      - type: "commits"
+        branch: "feat/{change_id}-phase{N}"
+      - file: "docs/changes/{change_id}/phase{N}-report.md"
+  
+  toolsets: ["file", "terminal", "skills"]
 ```
-用户：用增量 SDD 流程做 [项目] V4 重构
 
-编排器输出：
-🔍 流程判定: Standard (增量模式)
-阶段: PO → BA → Architect → [Phase 1] → [Phase 2] → [Phase 3] → 归档
-```
+### Reviewer阶段委托（按Phase）
 
-### 方式 2：Architect 指定
-
-在 `tasks.md` 中明确标注 Phase：
-
-```markdown
-## Phase 1: 基础数据层 [可独立交付]
-**交付标准**: Path + Radar API 全量测试通过
-
-## Phase 2: 核心服务层 [依赖 Phase 1]
-**交付标准**: Tutor + Certification API 测试通过
-
-## Phase 3: 验证与执行 [依赖 Phase 1+2]
-**交付标准**: Sandbox + Profile + Employer 测试通过
-```
-
-### 方式 3：命令行标志
-
-```bash
-# 启动增量模式
-hermes sdd start "变更描述" --incremental
-
-# 从指定 Phase 开始
-hermes sdd resume "change-id" --phase=2
+```yaml
+delegate_task:
+  goal: "评审 Phase {N} 的代码实现"
+  
+  context: |
+    change_id: "{change_id}"
+    phase_id: "phase_{N}"
+    
+    ## 检查范围
+    scope:
+      - "Phase {N} 相关文件"
+      - "不检查前面Phase（假设已稳定）"
+    
+    ## 回归检查
+    regression:
+      - "抽样10%前面Phase的测试"
+  
+  toolsets: ["file", "terminal", "skills"]
 ```
 
 ---
 
-## .sdd-state.json 扩展
+## Phase 依赖检查
 
-增量模式下，`.sdd-state.json` 包含 Phase 状态：
-
-```json
-{
-  "change_id": "[你的变更ID]",
-  "flow_level": "Standard",
-  "current_phase": "coder",
-  "current_sub_phase": "phase_2_core_service",
-  "phases_completed": ["po", "ba", "architect"],
-    "sub_phases_completed": ["phase_1_data_layer"],
-  "phase_status": {
-    "phase_1": {
-      "status": "qa_passed",
-      "ac_covered": ["AC1-AC14"],
-      "tasks_completed": ["T1-T10"],
-      "test_count": 293,
-      "review_status": "passed",
-      "qa_status": "passed",
-      "completed_at": "2026-05-30T10:00:00Z"
-    },
-    "phase_2": {
-      "status": "in_progress",
-      "ac_covered": ["AC15-AC21"],
-      "tasks_completed": [],
-      "depends_on": ["phase_1"]
-    }
-  },
-  "incremental_mode": true,
-  "started_at": "2026-05-28T08:00:00Z",
-  "updated_at": "2026-05-30T10:00:00Z"
-}
-```
-
-详见 [sdd-state-schema.md](../shared/sdd-state-schema.md)。
-
----
-
-## Phase 检查点
-
-### 1. Phase 依赖检查
-
-进入 Phase N 前，检查所有依赖 Phase 是否已完成 QA：
-
-```
-检查 Phase 2 依赖：
-- phase_1.status = "qa_passed" ✅ 通过
-- phase_1.review_status = "passed" ✅ 通过
-
-结论：可以进入 Phase 2
-```
-
-### 2. Phase 门禁检查
-
-Phase Coding 完成后，触发 Level 2.5 Phase 检查：
-
-```
-✓ Phase ID 格式正确
-✓ 依赖已满足
-✓ AC 覆盖非空
-✓ Task 完成数匹配
-
-结论：可以进入 Phase Review
-```
-
-### 3. Phase Review
-
-Reviewer Agent 仅检查当前 Phase 的代码：
-
-```
-Phase 1 Review：
-- 检查文件：models/path.py, models/radar.py, api/paths.py, api/radar.py
-- 结论：passed
-```
-
-### 4. Phase QA
-
-QA Agent 运行当前 Phase 测试 + 前面 Phase 回归测试：
-
-```
-Phase 2 QA：
-- Phase 2 测试：50 个 ✅
-- Phase 1 回归：29 个（10% 抽样）✅
-- AC 覆盖：15/15 = 100%
-
-结论：qa_passed
-```
-
-### 5. 用户确认
-
-Phase QA 通过后，询问用户是否进入下一 Phase：
-
-```
-🎉 Phase 2 已完成！
-- AC 覆盖：AC15-AC21（7 个）
-- 测试通过：50/50
-- 回归测试：29/29
-
-是否进入 Phase 3？
-[y] 是，进入 Phase 3
-[n] 否，暂停在此
-[b] 返回 Coder 修复
+```python
+def check_phase_dependencies(change_id, phase_id):
+    """检查Phase依赖是否满足"""
+    state = load_state(change_id)
+    phase = state["phase_config"]["phases"][phase_id]
+    
+    for dep_phase_id in phase.get("depends_on", []):
+        dep_phase = state["phase_config"]["phases"][dep_phase_id]
+        if dep_phase["status"] != "accepted":
+            return False, f"依赖Phase {dep_phase_id} 未完成"
+    
+    return True, None
 ```
 
 ---
 
 ## 回归测试策略
 
-为避免前面 Phase 被后面 Phase 破坏，每个 Phase QA 包含回归测试：
+| Phase | 当前测试 | 回归测试 | 说明 |
+|-------|:--------:|:--------:|------|
+| Phase 1 | 100% | — | 基线Phase |
+| Phase 2 | 100% | Phase 1 核心 10% | 验证不破坏Phase 1 |
+| Phase 3 | 100% | Phase 1+2 核心 10% | 验证不破坏前面Phase |
+| ... | ... | ... | ... |
 
-| Phase | 当前 Phase 测试 | 前面 Phase 回归 | 总测试数 |
-|-------|-----------------|-----------------|---------|
-| Phase 1 | 100% | — | 100% |
-| Phase 2 | 100% | Phase 1 核心 10% | ~110% |
-| Phase 3 | 100% | Phase 1+2 核心 10% | ~120% |
-
-**注意**：最终归档前的 QA 仍会运行全量回归测试。
-
----
-
-## 向后兼容
-
-- `incremental_mode` 默认为 `false`
-- 非增量模式下，所有 Phase 相关字段可选
-- 旧状态文件自动兼容，无需迁移
+**最终归档前**: 全量回归测试100%
 
 ---
 
-## 常见问题
+## 与普通模式的区别
 
-### Q1: 所有项目都应该用增量模式吗？
-
-**不是**。增量模式适用于：
-- 变更涉及 3+ 个独立模块
-- 变更估时 > 2 周
-- 需要早期验证核心功能
-
-小型变更（< 1 周，单模块）使用标准模式更高效。
-
-### Q2: Phase 拆分粒度如何确定？
-
-**原则**：每个 Phase 可独立验收。
-
-| 好的拆分 | 不好的拆分 |
-|----------|-----------|
-| Phase 1: 数据层 + 基础 API | Phase 1: 所有模型 |
-| Phase 2: 业务服务层 | Phase 2: 所有服务 |
-| Phase 3: 接入层 + 集成 | Phase 3: 所有 API |
-
-### Q3: Phase 间出现循环依赖怎么办？
-
-**Design 阶段必须解决**。若出现循环依赖，说明：
-1. Phase 拆分不合理，需调整
-2. 架构设计有缺陷，需重构
-
-### Q4: 可以在 Phase 进行中调整 Tasks 吗？
-
-**可以，但需重新 Review**。调整 Tasks 后：
-1. 更新 `tasks.md`
-2. 重新触发 Phase Review
-3. QA 验证新 Tasks
+| 对比项 | Standard模式 | 增量模式 |
+|--------|-------------|---------|
+| Coder委托 | 一次性委托所有Tasks | 按Phase分批委托 |
+| Review范围 | 全量代码 | 当前Phase代码 |
+| QA范围 | 全量测试 | 当前Phase + 10%回归 |
+| 用户确认 | 最终验收 | 每Phase验收 |
+| 归档时机 | QA通过后 | 所有Phase验收后 |
+| 状态机 | 标准状态 | 扩展Phase子状态 |
 
 ---
 
-## 最佳实践
+## 快速参考
 
-1. **Design 阶段明确 Phase 边界** — 在 Design 文档中说明各 Phase 的职责和依赖
-2. **Phase 1 尽量独立** — 降低后续 Phase 的风险
-3. **每 Phase 完成后演示** — 给用户看成果，获取反馈
-4. **保持 Phase 间松耦合** — 通过接口契约交互，避免直接依赖实现
-5. **文档更新同步** — 每 Phase 完成后更新 `docs/current/README.md`
+```bash
+# 启动增量模式
+python orchestrator.py start "大型重构" --incremental
+
+# 查看Phase状态
+python orchestrator.py status {change_id} --phase
+
+# 手动推进Phase
+python orchestrator.py phase-next {change_id}
+```
