@@ -74,6 +74,33 @@ metadata:
 
 Standard 全部 + 安全审查（Architect 之后）+ 性能测试（QA 之后）+ 灰度验证（用户验收前）
 
+#### 增量交付流程阶段
+
+适用于大型变更，按 Phase 拆分独立交付。
+
+| 阶段 | 子阶段 | 角色 Skill | 前置门禁 | 后置门禁 |
+|------|--------|-----------|---------|---------|
+| PO | — | `po-agent` | 无 | prd.md |
+| BA | — | `ba-agent` | prd.md | spec.md |
+| Architect | — | `architect-agent` | spec.md | design.md + tasks.md（含 Phase 标记） |
+| Coder | Phase 1 | `coder-agent` | tasks.md + Phase 1 依赖检查 | Phase 1 Coding 完成 |
+| Reviewer | Phase 1 | `reviewer-agent` | Phase 1 Coding 完成 | Phase 1 Review 报告 |
+| QA | Phase 1 | `qa-agent` | Phase 1 Review 通过 | Phase 1 QA 报告 |
+| — | Phase 1 验收 | — | Phase 1 QA 通过 | 用户确认 |
+| Coder | Phase 2 | `coder-agent` | Phase 1 验收 + Phase 2 依赖检查 | Phase 2 Coding 完成 |
+| Reviewer | Phase 2 | `reviewer-agent` | Phase 2 Coding 完成 | Phase 2 Review 报告 |
+| QA | Phase 2 | `qa-agent` | Phase 2 Review 通过 | Phase 2 QA 报告 |
+| — | Phase 2 验收 | — | Phase 2 QA 通过 | 用户确认 |
+| ... | ... | ... | ... | ... |
+| 归档 | — | — | 所有 Phase 验收通过 | 归档完成 |
+
+**启用方式**：
+- 用户明确说"用增量 SDD 流程做 xxx"
+- Architect 在 tasks.md 中标注 Phase
+- 命令行传入 `--incremental` 或 `--phase=N`
+
+详见 [references/incremental-mode.md](./references/incremental-mode.md)
+
 ### Phase 8: 归档
 
 #### Step 8.0: R10 检查（PR 流程合规）
@@ -246,22 +273,98 @@ effective_rules = [r for r in R1_R10 if r.id not in disable_rules]
 }
 ```
 
+**增量模式扩展**：
+
+```json
+{
+  "change_id": "002-ailp-v4-refactor",
+  "flow_level": "Standard",
+  "current_phase": "coder",
+  "current_sub_phase": "phase_2_tutor",
+  "phases_completed": ["po", "ba", "architect"],
+  "sub_phases_completed": ["phase_1_path_radar"],
+  "phase_status": {
+    "phase_1": {
+      "status": "qa_passed",
+      "ac_covered": ["AC1-AC14"],
+      "tasks_completed": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"],
+      "test_count": 293,
+      "review_status": "passed",
+      "qa_status": "passed",
+      "completed_at": "2026-05-30T10:00:00Z"
+    },
+    "phase_2": {
+      "status": "in_progress",
+      "ac_covered": ["AC15-AC21"],
+      "tasks_completed": [],
+      "depends_on": ["phase_1"]
+    }
+  },
+  "incremental_mode": true,
+  "started_at": "2026-05-28T08:00:00Z",
+  "updated_at": "2026-05-30T10:00:00Z"
+}
+```
+
+详见 [../shared/sdd-state-schema.md](../shared/sdd-state-schema.md)
+
 ### 恢复逻辑
 
 ```
 1. 读取 .sdd-state.json
 2. 确定 current_phase
-3. 检查当前阶段产物是否存在：
+3. 检查是否增量模式：
+   - incremental_mode = true → 进入 Phase 级恢复
+   - incremental_mode = false → 进入标准恢复
+```
+
+#### 标准恢复（非增量模式）
+
+```
+1. 检查当前阶段产物是否存在：
    - 产物完整 → 从当前阶段继续
    - 产物不完整 → 回退到上一个已完成阶段
    - 无产物 → 从 Phase 0 重新开始
-4. 输出恢复提示：
+2. 输出恢复提示：
    "🔄 检测到中断，从 Architect 阶段恢复..."
 ```
+
+#### Phase 级恢复（增量模式）
+
+```
+1. 确定 current_sub_phase（如 "phase_2_tutor"）
+2. 检查当前 Phase 状态：
+   - status = "in_progress" → 从当前 Phase Coder 继续
+   - status = "coding_done" → 进入 Phase Review
+   - status = "review_failed" → 返回 Phase Coder 修复
+   - status = "review_passed" → 进入 Phase QA
+   - status = "qa_failed" → 返回 Phase Coder 修复
+   - status = "qa_passed" → 等待用户确认进入下一 Phase
+3. 输出恢复提示：
+   "🔄 检测到中断，从 Phase 2 (Tutor) Coder 阶段恢复..."
+```
+
+### Phase 门禁检查
+
+增量模式下，编排器在以下时机执行 Phase 门禁检查：
+
+| 时机 | 检查内容 | 检查方式 |
+|------|---------|---------|
+| Phase N Coder 启动前 | Phase N-1 是否已验收 | 检查 `.sdd-state.json` phase_status |
+| Phase N Coding 完成后 | Phase 结构完整性 | 调用 sdd-structure-lint Level 2.5 |
+| Phase N Review 完成后 | Review 结论 | 检查 review-report.md Phase 章节 |
+| Phase N QA 完成后 | QA 结论 | 检查 qa-report.md Phase 章节 |
+| Phase N QA 通过后 | 用户确认 | 询问用户是否进入下一 Phase |
 
 ### 状态更新时机
 
 每完成一个阶段，立即更新 `.sdd-state.json`。
+
+**增量模式额外更新**：
+- Phase Coding 完成 → 更新 `phase_status[phase_id].status = "coding_done"`
+- Phase Review 通过 → 更新 `status = "review_passed"`, `review_status = "passed"`
+- Phase QA 通过 → 更新 `status = "qa_passed"`, `qa_status = "passed"`
+- Phase 用户验收 → 更新 `status = "accepted"`，添加到 `sub_phases_completed`
 
 ---
 

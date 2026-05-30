@@ -107,6 +107,78 @@ esac
 
 ---
 
+### Level 2.5: Phase 级检查（Phase-Level，增量模式）
+
+验证增量模式下各 Phase 的状态和依赖关系。
+
+**适用场景**：
+- `.sdd-state.json` 中 `incremental_mode: true`
+- Phase 切换前（检查目标 Phase 的依赖是否满足）
+
+**检查项**：
+
+| 检查项 | 验证逻辑 | 严重级别 |
+|--------|---------|:---:|
+| Phase ID 格式 | 符合 `^phase_\d+$` | CRITICAL |
+| Phase 依赖满足 | 若 `depends_on: ["phase_M"]`，则 `phase_M.status` 必须为 `qa_passed` 或 `accepted` | CRITICAL |
+| Phase 状态一致性 | 若 `status: "qa_passed"`，则 `qa_status` 必须为 `passed` | MAJOR |
+| AC 覆盖非空 | `ac_covered` 数组非空 | MAJOR |
+| Task 完成数匹配 | `tasks_completed` 数量与 `status` 阶段匹配 | MINOR |
+
+**执行方式**：
+
+```bash
+# 读取 .sdd-state.json
+state_file="docs/changes/${change_id}/.sdd-state.json"
+incremental_mode=$(jq -r '.incremental_mode // false' "$state_file")
+
+if [ "$incremental_mode" != "true" ]; then
+    echo "ℹ️ 非增量模式，跳过 Phase 检查"
+    exit 0
+fi
+
+# 检查每个 Phase
+jq -r '.phase_status | keys[]' "$state_file" | while read phase_id; do
+    # Phase ID 格式检查
+    if [[ ! "$phase_id" =~ ^phase_[0-9]+$ ]]; then
+        echo "✗ CRITICAL: Phase ID '$phase_id' 格式错误（应为 phase_N）"
+    fi
+    
+    # 依赖检查
+    deps=$(jq -r ".phase_status.${phase_id}.depends_on[]?" "$state_file" 2>/dev/null)
+    for dep in $deps; do
+        dep_status=$(jq -r ".phase_status.${dep}.status" "$state_file")
+        if [[ "$dep_status" != "qa_passed" && "$dep_status" != "accepted" ]]; then
+            echo "✗ CRITICAL: $phase_id 依赖 $dep，但 $dep 状态为 $dep_status（需 qa_passed/accepted）"
+        fi
+    done
+    
+    # 状态一致性检查
+    status=$(jq -r ".phase_status.${phase_id}.status" "$state_file")
+    qa_status=$(jq -r ".phase_status.${phase_id}.qa_status // \"null\"" "$state_file")
+    
+    if [[ "$status" == "qa_passed" && "$qa_status" != "passed" ]]; then
+        echo "✗ MAJOR: $phase_id status 为 qa_passed，但 qa_status 为 $qa_status"
+    fi
+    
+    # AC 覆盖检查
+    ac_count=$(jq ".phase_status.${phase_id}.ac_covered | length" "$state_file")
+    if [ "$ac_count" -eq 0 ]; then
+        echo "✗ MAJOR: $phase_id ac_covered 为空"
+    fi
+done
+```
+
+**编排器集成**：
+
+sdd-orchestrator 在增量模式下，于以下时机调用 Phase 检查：
+
+1. **Phase 切换前**：检查目标 Phase 的依赖是否满足
+2. **Phase Review 前**：检查 Phase 结构完整性（Coding 完成）
+3. **归档前**：检查所有 Phase 状态一致性
+
+---
+
 ### Level 3: 内容级检查（Content-Level）
 
 验证产物内容质量，确保 Agent 可解析。
