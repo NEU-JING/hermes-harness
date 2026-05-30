@@ -1,6 +1,6 @@
 # Hermes Harness — 项目基线
 
-> 最后更新：2026-05-25
+> 最后更新：2026-05-30
 > 当前版本：参考 `main` 分支最新 commit
 > 本文档由 SDD 归档流程自动维护（sdd-orchestrator Phase 8.1）
 
@@ -12,7 +12,7 @@
 - **增量交付**：支持（新增 Phase 级独立交付）
 - **角色 Skill**：8 个（po-agent, ba-agent, architect-agent, coder-agent, reviewer-agent, qa-agent, sdd-orchestrator, sdd-init）
 - **辅助 Skill**：1 个（sdd-structure-lint）
-- **已归档变更**：3（001-sdd-init, 002-project-onboarding, 003-git-and-docs）
+- **已归档变更**：4（001-sdd-init, 002-project-onboarding, 003-git-and-docs, 004-incremental-delivery）
 
 ---
 
@@ -82,6 +82,7 @@ Hermes Agent
 | 001-sdd-init | SDD 项目初始化 | 8 个角色 Skill + shared/ | 2026-05-24 |
 | 002-project-onboarding | 项目上手体验 | README + INSTALL + install.sh + templates/ + sdd-init 修改 | 2026-05-25 |
 | 003-git-and-docs | Git 工作流 + 基线维护 + README | git-workflow.md + orchestrator Phase 8 + docs/current/ + README 升级 | 2026-05-25 |
+| 004-incremental-delivery | SDD 增量交付支持 | State Schema + Orchestrator 增量模式 + Phase Review/QA + Tasks Phase 标记 | 2026-05-30 |
 
 ---
 
