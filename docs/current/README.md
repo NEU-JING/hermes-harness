@@ -9,6 +9,7 @@
 ## 项目状态
 
 - **SDD 流程**：Standard（8 阶段：PO → BA → Architect → Coder → Reviewer → QA → 验收 → 归档）
+- **增量交付**：支持（新增 Phase 级独立交付）
 - **角色 Skill**：8 个（po-agent, ba-agent, architect-agent, coder-agent, reviewer-agent, qa-agent, sdd-orchestrator, sdd-init）
 - **辅助 Skill**：1 个（sdd-structure-lint）
 - **已归档变更**：3（001-sdd-init, 002-project-onboarding, 003-git-and-docs）

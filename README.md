@@ -70,6 +70,26 @@ graph TD
 | **Quick** | Bug 修复、配置变更 | 跳过 PO/BA，Architect 轻量 → Coder → QA 轻量 |
 | **Standard**（默认） | 常规功能开发 | 完整 8 阶段 |
 | **Enhanced** | 安全/性能关键 | Standard + 安全审查 + 性能测试 + 灰度验证 |
+| **Incremental** | 大型重构/多模块 | 按 Phase 拆分，每 Phase 独立 Review → QA → 验收 |
+
+#### 增量交付模式
+
+适用于大型变更，按 Phase 拆分独立交付：
+
+```
+Phase 1 → Review → QA → 验收 → (可独立上线)
+   ↓
+Phase 2 → Review → QA → 验收 → (可独立上线)
+   ↓
+Phase 3 → Review → QA → 验收 → 归档
+```
+
+**启用方式**：
+```
+用增量 SDD 流程做 xxx
+```
+
+详见 [增量模式指南](skills/sdd/sdd-orchestrator/references/incremental-mode.md)
 
 ---
 
