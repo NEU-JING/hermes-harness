@@ -466,6 +466,62 @@ def phase_gate_transition(current_state, next_state):
 
 ---
 
+## Integration Notes (Hermes集成说明)
+
+### orchestrator.py与Hermes工具的集成
+
+`scripts/orchestrator.py` 是独立的可执行脚本，**需与Hermes工具集成**才能完整工作：
+
+| 功能 | orchestrator.py实现 | 需Hermes集成 |
+|:---|:---|:---:|
+| 状态机管理 | 完整实现 | ❌ |
+| 状态持久化 | 完整实现 | ❌ |
+| CLI接口 | 完整实现 | ❌ |
+| **lint检查执行** | 框架（检查文件存在） | ✅ 需调用 `sdd-structure-lint` |
+| **Agent委托** | 框架（打印说明） | ✅ 需调用 `delegate_task` |
+
+### 集成方式
+
+**方式1: 纯脚本模式（调试/测试）**
+```bash
+python scripts/orchestrator.py start "变更描述"
+# 手动按输出指示执行各阶段
+```
+
+**方式2: Hermes集成模式（生产）**
+```python
+# 在Hermes skill中使用
+from hermes_tools import delegate_task
+
+# 调用编排器获取当前状态
+state = orchestrator.load_state(change_id)
+
+# 根据状态委托agent
+if state.current_state == "PO_ENTRY":
+    result = delegate_task(
+        goal="产出PRD",
+        skill="po-agent",
+        context={...}
+    )
+    # 完成后推进状态
+    orchestrator.transition(change_id, "PO_CHECK")
+```
+
+### lint检查集成
+
+orchestrator.py中的 `execute_lint()` 需替换为：
+
+```python
+def execute_lint(self, level: str, change_id: str):
+    # 调用 sdd-structure-lint skill
+    skill_view(name='sdd-structure-lint')
+    # 执行对应level的检查
+    result = run_lint(level=level, path=change_dir)
+    return result.passed, result.errors
+```
+
+---
+
 ## References
 
 - [state-machine.md](./references/state-machine.md) — 完整状态机定义

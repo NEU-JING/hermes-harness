@@ -85,6 +85,7 @@ Hermes Agent
 | 003-git-and-docs | Git 工作流 + 基线维护 + README | git-workflow.md + orchestrator Phase 8 + docs/current/ + README 升级 | 2026-05-25 |
 | 004-incremental-delivery | SDD 增量交付支持 | State Schema + Orchestrator 增量模式 + Phase Review/QA + Tasks Phase 标记 | 2026-05-30 |
 | 005-harness-generalization | SDD 技能包通用化 | 7 个 AILP 引用文件通用化 + 9 个 SKILL.md frontmatter references 完整性 | 2026-05-30 |
+| 006-orchestrator-v2 | SDD Orchestrator v2.0 重构 | SKILL.md重写 + 6 references + orchestrator.py 可执行脚本 | 2026-05-30 |
 
 ---
 
