@@ -8,6 +8,9 @@ metadata:
   hermes:
     tags: [sdd, ba, spec, acceptance-criteria, requirements]
     related_skills: [po-agent, architect-agent, qa-agent]
+    references:
+      - references/ac-writing-guide.md
+      - references/spec-template.md
 ---
 
 # BA Agent — 需求分析师

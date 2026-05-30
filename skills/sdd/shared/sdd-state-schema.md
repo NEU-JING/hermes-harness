@@ -99,7 +99,7 @@
 
 ```json
 {
-  "change_id": "003-git-and-docs",
+  "change_id": "[你的变更ID]",
   "flow_level": "Standard",
   "current_phase": "coder",
   "phases_completed": ["po", "ba", "architect"],
@@ -112,12 +112,12 @@
 
 ```json
 {
-  "change_id": "002-ailp-v4-refactor",
+  "change_id": "[你的变更ID]",
   "flow_level": "Standard",
   "current_phase": "coder",
-  "current_sub_phase": "phase_2_tutor",
+  "current_sub_phase": "phase_2_core_service",
   "phases_completed": ["po", "ba", "architect"],
-  "sub_phases_completed": ["phase_1_path_radar"],
+  "sub_phases_completed": ["phase_1_data_layer"],
   "phase_status": {
     "phase_1": {
       "status": "qa_passed",
@@ -145,12 +145,12 @@
 
 ```json
 {
-  "change_id": "002-ailp-v4-refactor",
+  "change_id": "[你的变更ID]",
   "flow_level": "Standard",
   "current_phase": "coder",
-  "current_sub_phase": "phase_2_tutor",
+  "current_sub_phase": "phase_2_core_service",
   "phases_completed": ["po", "ba", "architect"],
-  "sub_phases_completed": ["phase_1_path_radar"],
+  "sub_phases_completed": ["phase_1_data_layer"],
   "phase_status": {
     "phase_1": {
       "status": "qa_passed",

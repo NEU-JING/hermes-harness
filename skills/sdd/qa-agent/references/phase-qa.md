@@ -62,7 +62,7 @@ pytest tests/test_radar.py::test_time_decay_calculation -v
 ```markdown
 # Phase QA Report
 
-> **变更 ID**: 002-ailp-v4-refactor  
+> **变更 ID**: [你的变更ID]  
 > **Phase**: phase_1_path_radar  
 > **日期**: 2026-05-30
 

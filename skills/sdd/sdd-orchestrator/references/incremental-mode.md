@@ -91,7 +91,7 @@ Phase 3 → Review → QA → 验收 → 归档
 ### 方式 1：用户明确指定
 
 ```
-用户：用增量 SDD 流程做 AILP V4 重构
+用户：用增量 SDD 流程做 [项目] V4 重构
 
 编排器输出：
 🔍 流程判定: Standard (增量模式)
@@ -131,12 +131,12 @@ hermes sdd resume "change-id" --phase=2
 
 ```json
 {
-  "change_id": "002-ailp-v4-refactor",
+  "change_id": "[你的变更ID]",
   "flow_level": "Standard",
   "current_phase": "coder",
-  "current_sub_phase": "phase_2_tutor",
+  "current_sub_phase": "phase_2_core_service",
   "phases_completed": ["po", "ba", "architect"],
-  "sub_phases_completed": ["phase_1_path_radar"],
+    "sub_phases_completed": ["phase_1_data_layer"],
   "phase_status": {
     "phase_1": {
       "status": "qa_passed",

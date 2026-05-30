@@ -8,6 +8,10 @@ metadata:
   hermes:
     tags: [sdd, review, code-review, quality]
     related_skills: [coder-agent, qa-agent, post-coding-review]
+    references:
+      - references/review-checklist.md
+      - references/severity-guide.md
+      - references/phase-review.md
 ---
 
 # Reviewer Agent — 代码评审员
