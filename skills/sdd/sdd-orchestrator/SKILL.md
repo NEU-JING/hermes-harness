@@ -1,411 +1,475 @@
 ---
 name: sdd-orchestrator
-description: Use as the central orchestrator for the SDD workflow. Determines flow level (Quick/Standard/Enhanced), dispatches role agents in sequence, enforces phase gates via sdd-structure-lint, handles archiving and interrupt recovery.
-version: 1.0.0
+description: Central workflow orchestrator for SDD. Enforces strict phase gates, manages state machine transitions, and delegates to role agents via delegate_task.
+version: 2.0.0
 author: Hermes Agent
 license: MIT
 metadata:
   hermes:
-    tags: [sdd, orchestrator, workflow, gate, archive]
+    tags: [sdd, orchestrator, workflow, state-machine, delegate]
     related_skills: [sdd-init, sdd-structure-lint, po-agent, ba-agent, architect-agent, coder-agent, reviewer-agent, qa-agent]
     references:
-      - references/sdd-workflow-activation-check.md
+      - references/state-machine.md
+      - references/phase-gates.md
+      - references/delegate-protocol.md
       - references/incremental-mode.md
-      - references/pr-and-review-flow.md
-      - references/quick-flow-phase-gates.md
+      - references/interrupt-recovery.md
 ---
 
-# SDD Orchestrator — 编排器
+# SDD Orchestrator v2.0 — 严格状态机编排器
 
 ## Overview
 
-编排器是 SDD 流程的中央调度器。负责判定流程级别、按序调度角色 Agent、在每个阶段门禁检查、最终归档。
+编排器是 SDD 流程的**中央状态机**。职责：
+1. **状态管理**：维护 `.sdd-state.json`，驱动状态机推进
+2. **门禁强制**：每个状态转换必须通过对应Level的lint检查
+3. **Agent委托**：使用 `delegate_task` 实际调度各角色Agent
+4. **流程管控**：任何偏离都阻断，必须修复后才能继续
 
-**核心职责**：保证 SDD 流程按规范执行，任何阶段不跳过必选门禁。
+**核心原则**：编排器不直接产出文档，只负责**状态推进和Agent调度**。
 
-## When to Use
+---
 
-- 用户发起一个新变更：`/sdd start {描述}`
-- 用户说 "用 SDD 流程做这个功能"
-- 从中断状态恢复：编排器自动检测 `.sdd-state.json`
+## State Machine（状态机）
 
-## Workflow
-
-### Phase 0: 流程判定
-
-1. 读取用户输入的变更描述
-2. 加载 `sdd/shared/flow-level-rules.md`（通过 skill_view）
-3. 调用判定逻辑 `determine_flow_level(description, changed_files, user_flag)`
-4. 输出判定结果：
-   ```
-   🔍 SDD 流程判定: Standard (变更涉及多个模块)
-   阶段: PO → BA → Architect → Coder → Reviewer → QA → 用户验收 → 归档
-   ```
-
-### Phase 1-7: 阶段调度
-
-每个阶段的调度模板：
+### Standard 流程状态图
 
 ```
-1. 调用门禁检查（当前阶段前置条件）
-2. 加载对应角色 Skill
-3. 执行角色工作流
-4. 等待角色完成（产出文件写入）
-5. 调用门禁检查（当前阶段后置条件 = 下一阶段前置条件）
-6. 更新 .sdd-state.json
+┌─────────┐    init     ┌─────────┐   lint L1   ┌─────────┐
+│  IDLE   │ ──────────▶ │   PO    │ ──────────▶ │  PO_    │
+│ (start) │             │ (entry) │             │ CHECK   │
+└─────────┘             └────┬────┘             └────┬────┘
+                             │                        │
+                             │ delegate po-agent      │ lint pass?
+                             │ ◀──────────────────────┘
+                             │ NO: retry/block
+                             │ YES: proceed
+                             ▼
+                       ┌─────────┐    user     ┌─────────┐
+                       │  PO_    │ ──────────▶ │   BA    │
+                       │  DONE   │   confirm   │ (entry) │
+                       └────┬────┘             └────┬────┘
+                            │                       │
+                            ▼                       ▼
+                      [prd.md created]        [lint + delegate
+                                                ba-agent]
+
+┌─────────┐   user    ┌─────────┐   lint    ┌─────────┐   delegate   ┌─────────┐
+│   BA    │ ────────▶ │  BA_    │ ───────▶ │ARCHITECT│ ───────────▶ │ ARCH_   │
+│  DONE   │ confirm   │ CHECK   │  pass   │ (entry)  │ architect-   │ CHECK   │
+└─────────┘           └─────────┘         └────┬────┘   agent       └────┬────┘
+                                               │                        │
+                                               ▼                        ▼
+                                         [design.md +              [lint pass?
+                                          tasks.md created]          user confirm?]
+┌─────────┐   lint    ┌─────────┐   delegate   ┌─────────┐   lint    ┌─────────┐
+│ CODER   │ ───────▶ │ CODER_  │ ───────────▶ │REVIEWER │ ───────▶ │ REVIEW_ │
+│(entry)  │  L2.5    │ CHECK   │  reviewer-   │(entry)   │  L3      │ CHECK   │
+│         │          │         │  agent       │          │          │         │
+└────┬────┘          └────┬────┘              └────┬────┘          └────┬────┘
+     │                    │                        │                   │
+     │ delegate           │ tasks all done?        │ review passed?    │
+     │ coder-agent        │ NO: continue           │ NO: back to coder │
+     │ (per task)         │ YES: proceed           │ YES: proceed      │
+     ▼                    ▼                        ▼                   ▼
+[commits]           [task reports]          [review-report.md]   [conclusion]
+
+┌─────────┐   lint    ┌─────────┐   delegate   ┌─────────┐   user    ┌─────────┐
+│   QA    │ ───────▶ │  QA_    │ ───────────▶ │  USER   │ ───────▶ │ARCHIVE_ │
+│(entry)  │  pass   │ CHECK   │   qa-agent   │ACCEPT   │ confirm   │ENTRY    │
+└────┬────┘         └────┬────┘              └────┬────┘           └────┬────┘
+     │                   │                        │                    │
+     │                   │ qa passed?             │                    │ R10 + L3
+     │                   │ NO: back to coder      │                    │
+     │                   │ YES: proceed           │                    ▼
+     ▼                   ▼                        ▼               [archive done]
+[tests run]        [qa-report.md]         [user says "归档"]
 ```
 
-#### Standard 流程阶段
+### 状态定义
 
-| 阶段 | 角色 Skill | 前置门禁 | 后置门禁（产物） |
-|------|-----------|---------|----------------|
-| PO | `po-agent` | 无 | prd.md + 用户确认 |
-| BA | `ba-agent` | prd.md | spec.md + 用户确认 |
-| Architect | `architect-agent` | spec.md | design.md + tasks.md + 用户确认 |
-| Coder | `coder-agent` | tasks.md | 代码 commits + Task 完成报告 |
-| Reviewer | `reviewer-agent` | 代码 commits | review-report.md |
-| QA | `qa-agent` | review-report.md (通过/有条件通过) | qa-report.md |
-| 用户验收 | — | qa-report.md (通过) | 用户明确确认 |
+| 状态 | 类型 | 说明 | 产物检查 |
+|------|:---:|:---|:---|
+| `IDLE` | 初始 | 流程未开始 | 无 |
+| `PO_ENTRY` | 执行 | PO Agent执行中 | `.sdd-state.json` 存在 |
+| `PO_CHECK` | 门禁 | L1检查PRD | `changes/{id}/prd.md` |
+| `PO_DONE` | 等待 | 等待用户确认 | `changes/{id}/prd.md` 存在 |
+| `BA_ENTRY` | 执行 | BA Agent执行中 | `prd.md` 存在 |
+| `BA_CHECK` | 门禁 | L1+L2检查Spec | `changes/{id}/spec.md` |
+| `BA_DONE` | 等待 | 等待用户确认 | `spec.md` 存在 |
+| `ARCHITECT_ENTRY` | 执行 | Architect Agent执行中 | `spec.md` 存在 |
+| `ARCHITECT_CHECK` | 门禁 | L2检查Design+Tasks | `changes/{id}/design.md` + `tasks.md` |
+| `ARCHITECT_DONE` | 等待 | 等待用户确认 | Design + Tasks 存在 |
+| `CODER_ENTRY` | 执行 | Coder Agent执行中 | `tasks.md` + Git clean |
+| `CODER_CHECK` | 门禁 | L2.5检查代码+报告 | Task完成报告 + commits |
+| `REVIEWER_ENTRY` | 执行 | Reviewer Agent执行中 | 代码已提交 |
+| `REVIEWER_CHECK` | 门禁 | L3检查Review报告 | `changes/{id}/review-report.md` |
+| `QA_ENTRY` | 执行 | QA Agent执行中 | Review通过 |
+| `QA_CHECK` | 门禁 | L3检查QA报告 | `changes/{id}/qa-report.md` |
+| `USER_ACCEPT` | 等待 | 等待用户验收确认 | QA通过 |
+| `ARCHIVE_ENTRY` | 执行 | 归档执行中 | 用户确认 |
+| `DONE` | 终止 | 流程完成 | 归档完成 |
+| `BLOCKED` | 终止 | 流程阻断 | 需人工介入 |
 
-#### Quick 流程阶段
+---
 
-| 阶段 | 角色 Skill | 说明 |
-|------|-----------|------|
-| Architect（轻量） | `architect-agent` | 跳过 Brainstorming，产出简化 tasks.md |
-| Coder | `coder-agent` | 正常执行 |
-| QA（轻量） | `qa-agent` | 跳过 E2E，仅单元测试 |
+## State Transition（状态转换）
 
-#### Enhanced 流程额外阶段
+### 转换规则
 
-Standard 全部 + 安全审查（Architect 之后）+ 性能测试（QA 之后）+ 灰度验证（用户验收前）
+每个状态转换必须满足：
+1. **前置条件**：当前状态的产物检查通过
+2. **Lint检查**：调用 `sdd-structure-lint` 对应Level
+3. **用户确认**（可选）：特定状态需要用户明确输入
 
-#### 增量交付流程阶段
+### 转换矩阵
 
-适用于大型变更，按 Phase 拆分独立交付。
+| 当前状态 | 触发条件 | 下一状态 | Lint Level | 用户确认 |
+|---------|---------|---------|:----------:|:--------:|
+| `IDLE` | `sdd start` | `PO_ENTRY` | L1 | ❌ |
+| `PO_ENTRY` | po-agent完成 | `PO_CHECK` | L1 | ❌ |
+| `PO_CHECK` | lint通过 | `PO_DONE` | — | ❌ |
+| `PO_DONE` | 用户说"继续" | `BA_ENTRY` | — | ✅ |
+| `BA_ENTRY` | ba-agent完成 | `BA_CHECK` | L1+L2 | ❌ |
+| `BA_CHECK` | lint通过 | `BA_DONE` | — | ❌ |
+| `BA_DONE` | 用户说"继续" | `ARCHITECT_ENTRY` | — | ✅ |
+| `ARCHITECT_ENTRY` | architect-agent完成 | `ARCHITECT_CHECK` | L2 | ❌ |
+| `ARCHITECT_CHECK` | lint通过 | `ARCHITECT_DONE` | — | ❌ |
+| `ARCHITECT_DONE` | 用户说"开始编码" | `CODER_ENTRY` | — | ✅ |
+| `CODER_ENTRY` | coder-agent完成 | `CODER_CHECK` | L2.5 | ❌ |
+| `CODER_CHECK` | lint通过 | `REVIEWER_ENTRY` | — | ❌ |
+| `REVIEWER_ENTRY` | reviewer-agent完成 | `REVIEWER_CHECK` | L3 | ❌ |
+| `REVIEWER_CHECK` | review通过 | `QA_ENTRY` | — | ❌ |
+| `REVIEWER_CHECK` | review不通过 | `CODER_ENTRY` | — | ❌ |
+| `QA_ENTRY` | qa-agent完成 | `QA_CHECK` | L3 | ❌ |
+| `QA_CHECK` | qa通过 | `USER_ACCEPT` | — | ❌ |
+| `QA_CHECK` | qa不通过 | `CODER_ENTRY` | — | ❌ |
+| `USER_ACCEPT` | 用户说"归档" | `ARCHIVE_ENTRY` | — | ✅ |
+| `ARCHIVE_ENTRY` | 归档完成 | `DONE` | R10+L3 | ❌ |
 
-| 阶段 | 子阶段 | 角色 Skill | 前置门禁 | 后置门禁 |
-|------|--------|-----------|---------|---------|
-| PO | — | `po-agent` | 无 | prd.md |
-| BA | — | `ba-agent` | prd.md | spec.md |
-| Architect | — | `architect-agent` | spec.md | design.md + tasks.md（含 Phase 标记） |
-| Coder | Phase 1 | `coder-agent` | tasks.md + Phase 1 依赖检查 | Phase 1 Coding 完成 |
-| Reviewer | Phase 1 | `reviewer-agent` | Phase 1 Coding 完成 | Phase 1 Review 报告 |
-| QA | Phase 1 | `qa-agent` | Phase 1 Review 通过 | Phase 1 QA 报告 |
-| — | Phase 1 验收 | — | Phase 1 QA 通过 | 用户确认 |
-| Coder | Phase 2 | `coder-agent` | Phase 1 验收 + Phase 2 依赖检查 | Phase 2 Coding 完成 |
-| Reviewer | Phase 2 | `reviewer-agent` | Phase 2 Coding 完成 | Phase 2 Review 报告 |
-| QA | Phase 2 | `qa-agent` | Phase 2 Review 通过 | Phase 2 QA 报告 |
-| — | Phase 2 验收 | — | Phase 2 QA 通过 | 用户确认 |
-| ... | ... | ... | ... | ... |
-| 归档 | — | — | 所有 Phase 验收通过 | 归档完成 |
+---
 
-**启用方式**：
-- 用户明确说"用增量 SDD 流程做 xxx"
-- Architect 在 tasks.md 中标注 Phase
-- 命令行传入 `--incremental` 或 `--phase=N`
+## Agent Delegation（Agent委托）
 
-详见 [references/incremental-mode.md](./references/incremental-mode.md)
+编排器使用 `delegate_task` 调用各角色Agent。
 
-### Phase 8: 归档
+### 委托协议
 
-#### Step 8.0: R10 检查（PR 流程合规）
+```yaml
+delegate_task:
+  goal: "[当前阶段目标]"
+  context: |
+    # 当前变更上下文
+    change_id: "{change_id}"
+    current_state: "{state}"
+    flow_level: "{Quick|Standard|Enhanced}"
+    incremental_mode: "{true|false}"
+    
+    # 前置产物（路径列表）
+    prerequisites:
+      - "{prereq1_path}"
+      - "{prereq2_path}"
+    
+    # 产出要求
+    deliverables:
+      - file: "{output_path}"
+        template: "{template_ref}"
+    
+    # 约束（来自AGENTS.md/CONSTITUTION.md）
+    constraints:
+      - "{constraint1}"
+      - "{constraint2}"
+  
+  toolsets: ["file", "terminal", "skills"]
+  role: "leaf"
+```
 
-加载 `sdd/shared/git-workflow.md` 规范，执行以下检查：
+### 各阶段委托规范
 
-1. **检测当前分支**：
-   执行 `git branch --show-current`，获取 `$BRANCH`
-   - 若 `$BRANCH` != `main` → **阻断归档**，输出：
-     ```
-     ❌ R10 阻断: 当前在 {BRANCH} 分支。
-        请先合并到 main 后重新归档：
-        git checkout main
-        git merge --squash {BRANCH}
-     ```
-     退出码 1，终止归档。
-   - 若 `$BRANCH` = `main` → 继续下一步。
+#### PO阶段委托
 
-2. **检测 PR merge 记录**（检查最近 5 个 commit）：
-   执行 `git log -5 --oneline --merges`
-   - 若无 merge commit → **阻断归档**，输出：
-     ```
-     ❌ R10 阻断: 未检测到 PR merge 记录。
-        SDD 要求所有变更通过 PR 合并到 main。
-        git checkout -b feat/{change_id}
-        git push origin feat/{change_id}
-        # 在 GitHub 创建 PR 并 squash merge
-        # 紧急修复可使用 --bypass-r10 豁免
-     ```
-     退出码 1，终止归档。
-   - 若有 merge commit → 通过，继续下一步。
+```yaml
+goal: "根据变更描述产出PRD文档，明确目标、用户、功能范围、非目标、成功指标"
+context: |
+  change_id: "{change_id}"
+  description: "{user_input_description}"
+  phase: "po"
+  output: "docs/changes/{change_id}/prd.md"
+  
+  # PRD必须包含的章节
+  required_sections:
+    - "背景与目标"
+    - "目标用户"
+    - "功能范围（功能表）"
+    - "非目标"
+    - "成功指标"
+    - "用户场景"
 
-3. **--bypass-r10 豁免**：
-   若用户传入 `--bypass-r10` 标志 → 跳过 R10 检查，输出：
-   ```
-   ⚠️ R10 豁免: --bypass-r10 已激活，跳过 PR 流程检查。
-   此豁免将记录到归档日志。
-   ```
-   在 `docs/current/README.md` 变更历史中标注 `HOTFIX`。
+deliverables:
+  - file: "docs/changes/{change_id}/prd.md"
+    template: "po-agent/templates/prd-template.md"
+```
 
-#### Step 8.1: 基线融合（PRD + Spec + Design → 当前生产基线）
+#### BA阶段委托
 
-基线文档 `docs/current/README.md` 是**当前生产版本的唯一真相源**——它不是变更日志，而是所有已归档变更融合后的"项目全貌"。每次归档时，将 PRD/Spec/Design 的关键内容**融合进**基线对应章节。
+```yaml
+goal: "根据PRD产出Spec文档，细化需求并编写AC（Given-When-Then）"
+context: |
+  change_id: "{change_id}"
+  prd_path: "docs/changes/{change_id}/prd.md"
+  phase: "ba"
+  output: "docs/changes/{change_id}/spec.md"
+  
+  # Spec必须包含的章节
+  required_sections:
+    - "需求清单（R1-RN，对应PRD功能）"
+    - "每个需求的AC（Given-When-Then）"
+    - "边界情况"
+    - "数据契约"
 
-**融合逻辑（按章节）**：
+deliverables:
+  - file: "docs/changes/{change_id}/spec.md"
+    template: "ba-agent/templates/spec-template.md"
+```
 
-##### 8.1.1: 初始化检查
+#### Architect阶段委托
 
-`docs/current/README.md` 不存在 → 按基线模板完整初始化。存在 → 按以下步骤逐章节更新。
+```yaml
+goal: "根据Spec产出Design文档和Tasks拆分"
+context: |
+  change_id: "{change_id}"
+  spec_path: "docs/changes/{change_id}/spec.md"
+  phase: "architect"
+  outputs:
+    - "docs/changes/{change_id}/design.md"
+    - "docs/changes/{change_id}/tasks.md"
+  
+  # Design必须包含的章节
+  required_sections:
+    - "架构决策"
+    - "数据流/时序图"
+    - "接口定义"
+    - "产出物清单"
+  
+  # Tasks必须包含的章节
+  task_requirements:
+    - "按业务场景拆分的Task列表"
+    - "每个Task可独立部署"
+    - "Task间依赖关系"
+    - "Phase标记（增量模式）"
 
-##### 8.1.2: 融合「项目状态」
+deliverables:
+  - file: "docs/changes/{change_id}/design.md"
+    template: "architect-agent/templates/design-template.md"
+  - file: "docs/changes/{change_id}/tasks.md"
+    template: "architect-agent/templates/tasks-template.md"
+```
 
-从 PRD 的"背景与目标"章节提取：
-- 新增了什么能力（一句描述）
-- 解决了什么问题
+#### Coder阶段委托
 
-若该变更引入了新的项目级属性（如新流程级别、新规则类型），追加到现状描述中。
+```yaml
+goal: "按Tasks逐步实现代码，每个Task遵循TDD"
+context: |
+  change_id: "{change_id}"
+  tasks_path: "docs/changes/{change_id}/tasks.md"
+  design_path: "docs/changes/{change_id}/design.md"
+  phase: "coder"
+  
+  # TDD要求
+  tdd_requirements:
+    - "每个Task必须先写测试（RED）"
+    - "实现代码使测试通过（GREEN）"
+    - "重构（REFACTOR）"
+    - "提交commit"
+  
+  # 代码约束（来自AGENTS.md）
+  code_constraints: "{from AGENTS.md conventions}"
 
-##### 8.1.3: 融合「架构概览」
+deliverables:
+  - type: "commits"
+    branch: "feat/{change_id}"
+  - file: "docs/changes/{change_id}/completion-report.md"
+    template: "coder-agent/templates/task-completion-report.md"
+```
 
-从 Design 的"产出物清单"和"架构设计"章节提取：
-- 新增了哪些文件/目录 → 追加到架构树
-- 删除了哪些文件/目录 → 从架构树中移除
-- 修改了哪些模块的职责 → 更新对应描述
+#### Reviewer阶段委托
 
-架构树应始终反映**当前仓库根目录的实际结构**。
+```yaml
+goal: "评审代码实现，检查Spec合规、代码质量、架构一致性"
+context: |
+  change_id: "{change_id}"
+  spec_path: "docs/changes/{change_id}/spec.md"
+  design_path: "docs/changes/{change_id}/design.md"
+  completion_report: "docs/changes/{change_id}/completion-report.md"
+  phase: "reviewer"
+  
+  # 三阶段评审
+  review_phases:
+    - "Phase 1: Spec合规（AC覆盖检查）"
+    - "Phase 2: 代码质量（DRY/YAGNI/命名/错误处理）"
+    - "Phase 3: 架构一致性（模块/接口/数据流）"
+  
+  # 严重级别
+  severity_levels: ["CRITICAL", "MAJOR", "MINOR", "INFO"]
 
-##### 8.1.4: 融合「Skill 清单」+「共享规范」
+deliverables:
+  - file: "docs/changes/{change_id}/review-report.md"
+    template: "reviewer-agent/templates/review-report.md"
+    required_sections:
+      - "评审结论（通过/有条件通过/不通过）"
+      - "问题清单（严重级别排序）"
+      - "修复建议"
+```
 
-从 Design 的"产出物清单 → 无需修改"和"修改文件"章节判断：
-- 若变更涉及 `skills/sdd/` 下文件修改 → 重新扫描 `skills/sdd/` 目录，刷新 Skill 清单表格和共享规范表格
-- 若变更不涉及 → 保持不变
+#### QA阶段委托
 
-##### 8.1.5: 追加「变更历史」记录
+```yaml
+goal: "验证AC覆盖，执行测试，产出QA报告"
+context: |
+  change_id: "{change_id}"
+  spec_path: "docs/changes/{change_id}/spec.md"
+  review_report: "docs/changes/{change_id}/review-report.md"
+  phase: "qa"
+  
+  # QA检查
+  qa_checks:
+    - "AC覆盖矩阵（每个AC有测试）"
+    - "测试执行（单元/集成/E2E）"
+    - "环境差异检查"
+    - "熔断检查（连续失败）"
 
-在变更历史表格末尾追加一行：
-```markdown
-| {change_id} | {PRD 标题} | {Design 影响范围摘要} | {当前日期} |
+deliverables:
+  - file: "docs/changes/{change_id}/qa-report.md"
+    template: "qa-agent/templates/qa-report.md"
+    required_sections:
+      - "AC覆盖矩阵"
+      - "测试结果统计"
+      - "环境差异说明"
+      - "结论（通过/不通过）"
 ```
 
 ---
 
-**融合原则**：
-- **增量更新，不重写全量**：只更新受影响的章节，保持基线文档的历史连续性
-- **Design 为权威源**：架构决策和文件变更以 Design 为准
-- **PRD 为上下文源**：项目目标和能力描述以 PRD 为准
-- **变更历史为追溯源**：保留每次变更的记录，但不替代融合内容
+## Phase Gates（阶段门禁）
 
-#### Step 8.2: 最终门禁检查
+每个状态转换必须通过的检查。
 
-调用 sdd-structure-lint Level 1+2+3（全量检查）。通过则继续，不通过则阻断并输出错误报告。
+### Lint Level 映射
 
-#### Step 8.3: 文件移动
+| 状态转换 | Lint Level | 检查内容 |
+|---------|:----------:|---------|
+| `IDLE → PO_ENTRY` | L1 | 目录结构初始化 |
+| `PO_ENTRY → PO_CHECK` | L1 | PRD文件存在、格式正确 |
+| `BA_ENTRY → BA_CHECK` | L1+L2 | Spec文件存在、AC格式正确 |
+| `ARCHITECT_ENTRY → ARCHITECT_CHECK` | L2 | Design+Tasks存在、格式正确 |
+| `CODER_ENTRY → CODER_CHECK` | L2.5 | Task完成、commits存在 |
+| `REVIEWER_ENTRY → REVIEWER_CHECK` | L3 | Review报告存在、结论明确 |
+| `QA_ENTRY → QA_CHECK` | L3 | QA报告存在、AC覆盖完整 |
+| `ARCHIVE_ENTRY → DONE` | R10+L3 | PR merged、归档结构正确 |
 
-移动变更目录：
-```bash
-mv docs/changes/{change_id} docs/archive/{change_id}
-```
+### 门禁执行流程
 
-#### Step 8.4: 清理
-
-```bash
-rm docs/archive/{change_id}/.sdd-state.json
-```
-
-#### Step 8.5: 输出归档摘要
-
-```
-✅ 归档完成: {change_id}
-📁 归档位置: docs/archive/{change_id}/
-📄 基线更新: docs/current/README.md
-🔒 R10 检查: {通过/豁免(HOTFIX)}
-```
-
----
-
-## 门禁检查
-
-每个阶段切换前，编排器调用 sdd-structure-lint：
-
-```
-skill_view(name='sdd-structure-lint')
-→ 根据当前阶段执行对应 Level 检查
-→ Level 1: 基础文件存在性
-→ Level 2: 当前阶段产物存在性
-→ Level 3: 内容质量（归档前）
-→ 通过 → 继续
-→ 不通过 → 阻断，输出错误报告
-```
-
----
-
-## 规则检查
-
-编排器在以下时机检查 R1-R10（加载 `sdd/shared/sdd-rules.md`）：
-
-| 时机 | 检查规则 |
-|------|---------|
-| Coder 阶段启动前 | R1（spec.md 存在）|
-| Coder 每 Task 执行 | R3（TDD 自检，由 coder-agent 执行）|
-| Reviewer 阶段后 | R4（review-report.md 存在）|
-| QA 阶段 | R6（测试自包含）、R7（E2E-AC 映射）、R9（CI-only 标记）|
-| Git push 时 | R8（pre-commit hook）|
-| 归档前 | R10（PR 不直接 push main）|
-
-**规则覆盖**：读取 AGENTS.md 的 `convention_overrides`：
 ```python
-disable_rules = parse_agents_md("convention_overrides.disable_rules")
-effective_rules = [r for r in R1_R10 if r.id not in disable_rules]
+def phase_gate_transition(current_state, next_state):
+    """状态转换门禁检查"""
+    
+    # 1. 确定需要的lint level
+    lint_level = get_lint_level(current_state, next_state)
+    
+    # 2. 执行lint检查（强制，不通过则阻断）
+    result = run_sdd_structure_lint(
+        level=lint_level,
+        change_id=current_change_id,
+        path=f"docs/changes/{current_change_id}"
+    )
+    
+    if not result.passed:
+        # 阻断：不转换状态，返回错误报告
+        update_state_json({
+            "state": current_state,  # 保持原状态
+            "blocked_reason": result.errors,
+            "last_check": "failed"
+        })
+        return PhaseGateResult(
+            success=False,
+            errors=result.errors,
+            next_state=None  # 不推进
+        )
+    
+    # 3. 通过：更新状态并推进
+    update_state_json({
+        "state": next_state,
+        "last_check": "passed",
+        "updated_at": now()
+    })
+    
+    return PhaseGateResult(success=True, next_state=next_state)
 ```
-
----
-
-## 中断恢复
-
-编排器可能因 Agent 重启、用户中断等原因中止。恢复机制：
-
-### 状态文件
-
-文件：`docs/changes/{change_id}/.sdd-state.json`
-
-```json
-{
-  "change_id": "001-sdd-init",
-  "flow_level": "Standard",
-  "current_phase": "architect",
-  "phases_completed": ["po", "ba"],
-  "started_at": "2026-05-25T10:00:00Z",
-  "updated_at": "2026-05-25T11:30:00Z"
-}
-```
-
-**增量模式扩展**：
-
-```json
-{
-  "change_id": "[你的变更ID]",
-  "flow_level": "Standard",
-  "current_phase": "coder",
-  "current_sub_phase": "phase_2_tutor",
-  "phases_completed": ["po", "ba", "architect"],
-  "sub_phases_completed": ["phase_1_path_radar"],
-  "phase_status": {
-    "phase_1": {
-      "status": "qa_passed",
-      "ac_covered": ["AC1-AC14"],
-      "tasks_completed": ["T1", "T2", "T3", "T4", "T5", "T6", "T7", "T8", "T9", "T10"],
-      "test_count": 293,
-      "review_status": "passed",
-      "qa_status": "passed",
-      "completed_at": "2026-05-30T10:00:00Z"
-    },
-    "phase_2": {
-      "status": "in_progress",
-      "ac_covered": ["AC15-AC21"],
-      "tasks_completed": [],
-      "depends_on": ["phase_1"]
-    }
-  },
-  "incremental_mode": true,
-  "started_at": "2026-05-28T08:00:00Z",
-  "updated_at": "2026-05-30T10:00:00Z"
-}
-```
-
-详见 [../shared/sdd-state-schema.md](../shared/sdd-state-schema.md)
-
-### 恢复逻辑
-
-```
-1. 读取 .sdd-state.json
-2. 确定 current_phase
-3. 检查是否增量模式：
-   - incremental_mode = true → 进入 Phase 级恢复
-   - incremental_mode = false → 进入标准恢复
-```
-
-#### 标准恢复（非增量模式）
-
-```
-1. 检查当前阶段产物是否存在：
-   - 产物完整 → 从当前阶段继续
-   - 产物不完整 → 回退到上一个已完成阶段
-   - 无产物 → 从 Phase 0 重新开始
-2. 输出恢复提示：
-   "🔄 检测到中断，从 Architect 阶段恢复..."
-```
-
-#### Phase 级恢复（增量模式）
-
-```
-1. 确定 current_sub_phase（如 "phase_2_tutor"）
-2. 检查当前 Phase 状态：
-   - status = "in_progress" → 从当前 Phase Coder 继续
-   - status = "coding_done" → 进入 Phase Review
-   - status = "review_failed" → 返回 Phase Coder 修复
-   - status = "review_passed" → 进入 Phase QA
-   - status = "qa_failed" → 返回 Phase Coder 修复
-   - status = "qa_passed" → 等待用户确认进入下一 Phase
-3. 输出恢复提示：
-   "🔄 检测到中断，从 Phase 2 (Tutor) Coder 阶段恢复..."
-```
-
-### Phase 门禁检查
-
-增量模式下，编排器在以下时机执行 Phase 门禁检查：
-
-| 时机 | 检查内容 | 检查方式 |
-|------|---------|---------|
-| Phase N Coder 启动前 | Phase N-1 是否已验收 | 检查 `.sdd-state.json` phase_status |
-| Phase N Coding 完成后 | Phase 结构完整性 | 调用 sdd-structure-lint Level 2.5 |
-| Phase N Review 完成后 | Review 结论 | 检查 review-report.md Phase 章节 |
-| Phase N QA 完成后 | QA 结论 | 检查 qa-report.md Phase 章节 |
-| Phase N QA 通过后 | 用户确认 | 询问用户是否进入下一 Phase |
-
-### 状态更新时机
-
-每完成一个阶段，立即更新 `.sdd-state.json`。
-
-**增量模式额外更新**：
-- Phase Coding 完成 → 更新 `phase_status[phase_id].status = "coding_done"`
-- Phase Review 通过 → 更新 `status = "review_passed"`, `review_status = "passed"`
-- Phase QA 通过 → 更新 `status = "qa_passed"`, `qa_status = "passed"`
-- Phase 用户验收 → 更新 `status = "accepted"`，添加到 `sub_phases_completed`
 
 ---
 
 ## 使用方式
 
-### 发起新变更
+### 启动新变更
 
-用户说：
 ```
-"用 SDD 流程做用户登录功能"
+用户：用SDD流程做用户登录功能
+
+编排器：
+1. 判定流程级别：Standard
+2. 创建 changes/006-user-login/ 目录
+3. 初始化 .sdd-state.json: { state: "IDLE", ... }
+4. 状态转换：IDLE → PO_ENTRY
+5. 调用 delegate_task 委托 po-agent
+   - goal: "产出PRD文档..."
+   - context: { change_id: "006-user-login", description: "用户登录功能" }
+6. 等待po-agent完成
+7. 状态转换：PO_ENTRY → PO_CHECK（执行L1 lint）
+8. lint通过 → PO_DONE
+9. 等待用户确认...
 ```
 
-编排器响应：
-```
-🔍 流程判定: Standard
-📋 阶段: PO → BA → Architect → Coder → Reviewer → QA → 用户验收 → 归档
-📁 变更目录: docs/changes/002-user-login/
+### 用户确认指令
 
-开始 PO 阶段...
-→ 加载 po-agent skill
-→ 产出 PRD 等待用户确认
-```
+| 当前状态 | 用户指令 | 动作 |
+|---------|---------|------|
+| `PO_DONE` | "继续"/"下一步" | → `BA_ENTRY` |
+| `BA_DONE` | "继续"/"下一步" | → `ARCHITECT_ENTRY` |
+| `ARCHITECT_DONE` | "开始编码" | → `CODER_ENTRY` |
+| `USER_ACCEPT` | "归档" | → `ARCHIVE_ENTRY` |
+| 任意等待状态 | "状态" | 输出当前状态和产物 |
+| 任意状态 | "中断" | 保存状态，可恢复 |
 
 ### 恢复中断
 
 ```
-编排器自动检测 .sdd-state.json
-→ "🔄 检测到中断，从 Reviewer 阶段恢复..."
+用户：恢复SDD流程
+
+编排器：
+1. 读取 .sdd-state.json
+2. 检测 current_state
+3. 若 state 为 EXECUTING 状态 → 重新委托对应agent
+4. 若 state 为 WAITING 状态 → 等待用户指令
+5. 若 state 为 BLOCKED → 显示阻断原因
 ```
 
 ---
 
 ## Common Pitfalls
 
-1. **门禁检查缺失**：阶段切换前不检查前置条件 → 下一阶段缺少输入
-2. **规则覆盖未读取**：AGENTS.md 声明了 disable_rules 但编排器未处理 → R5 在无前端项目中被执行
-3. **中断恢复不清**：.sdd-state.json 未更新 → 恢复时从错误阶段开始
-4. **Quick 流程未豁免规则**：Quick 流程仍检查 R1（Spec 存在）→ 应豁免
-5. **归档前未全量 lint**：直接归档而未检查 → 不完整的变更目录进入归档
+1. **跳过门禁检查**：编排器必须强制执行lint，不能依赖agent自律
+2. **状态不同步**：每次状态转换必须立即更新 `.sdd-state.json`
+3. **委托上下文不全**：delegate_task的context必须包含完整的前置产物路径
+4. **用户确认缺失**：PO_DONE/BA_DONE/ARCHITECT_DONE/USER_ACCEPT必须等待用户确认
+5. **恢复状态错误**：恢复时要重新检查当前状态产物是否存在，不存在则回退
+6. **增量模式状态复杂**：Phase级状态需要额外维护 sub_phase_status
+
+---
+
+## References
+
+- [state-machine.md](./references/state-machine.md) — 完整状态机定义
+- [phase-gates.md](./references/phase-gates.md) — 门禁检查详细规范
+- [delegate-protocol.md](./references/delegate-protocol.md) — Agent委托协议
+- [incremental-mode.md](./references/incremental-mode.md) — 增量交付模式
+- [interrupt-recovery.md](./references/interrupt-recovery.md) — 中断恢复机制
