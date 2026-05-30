@@ -87,7 +87,7 @@ git diff A..B --name-only
 ```markdown
 # Phase Review Report
 
-> **变更 ID**: 002-ailp-v4-refactor  
+> **变更 ID**: [你的变更ID]  
 > **Phase**: phase_1_path_radar  
 > **日期**: 2026-05-30
 

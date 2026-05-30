@@ -8,6 +8,8 @@ metadata:
   hermes:
     tags: [sdd, po, product, requirements, prd]
     related_skills: [ba-agent, sdd-orchestrator]
+    references:
+      - references/prd-template.md
 ---
 
 # PO Agent — 产品需求定义

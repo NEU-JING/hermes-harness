@@ -8,6 +8,7 @@ metadata:
   hermes:
     tags: [sdd, lint, compliance, verification, structure]
     related_skills: [sdd-orchestrator, sdd-init, writing-plans]
+    references: []
 ---
 
 # SDD Structure Lint — 三级合规验证

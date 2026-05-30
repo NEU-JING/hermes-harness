@@ -8,6 +8,7 @@ metadata:
   hermes:
     tags: [sdd, init, setup, scaffolding, upgrade]
     related_skills: [sdd-structure-lint, sdd-orchestrator]
+    references: []
 ---
 
 # SDD Init — 项目初始化与升级

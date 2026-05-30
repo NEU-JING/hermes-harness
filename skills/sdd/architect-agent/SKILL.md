@@ -8,6 +8,11 @@ metadata:
   hermes:
     tags: [sdd, architect, design, tasks, brainstorming]
     related_skills: [ba-agent, coder-agent, sdd-orchestrator]
+    references:
+      - references/brainstorming-guide.md
+      - references/design-template.md
+      - references/handoff-to-coder.md
+      - references/tasks-template.md
 ---
 
 # Architect Agent — 技术架构师

@@ -1,7 +1,7 @@
 # PR 与 Review 回退流程
 
 > 本文档记录 Coder → Reviewer → QA → 验收 阶段的 Git PR 工作流和回退机制。
-> 这是 003-git-and-docs 变更中实际踩过的坑和修正方案。
+> 这是 [变更ID] 变更中实际踩过的坑和修正方案。
 
 ---
 
@@ -42,7 +42,7 @@ Coder → Reviewer（第 1 轮）
 
 ---
 
-## 本次 003 变更的实战案例
+## 本次 [变更ID] 变更的实战案例
 
 ### 问题 1: PR merge 时机错误
 
@@ -64,13 +64,13 @@ Coder → Reviewer（第 1 轮）
 
 ### 问题 4: Commit 落在 main 而非 feature 分支（本次 session）
 
-- **现象**：SDD 003 的 commits 直接 commit 到了 main 分支，用户反馈"我没有看到 pr 请求呢"
+- **现象**：SDD [变更ID] 的 commits 直接 commit 到了 main 分支，用户反馈"我没有看到 pr 请求呢"
 - **根因**：Coder 阶段未切到 feature 分支就开始编码；git-workflow 规范尚未生效（本身是 003 的产出）
 - **影响**：无 PR 可审查，违反 R10
 - **修复流程**（恢复技巧）：
-  1. `git reset --hard <SDD 003 之前的 commit>` — 回退 main
+  1. `git reset --hard <[变更ID] 之前的 commit>` — 回退 main
   2. `git checkout feat/###-xxx && git reset --hard <same base>` — 重置 feature 分支
-  3. `git cherry-pick <c1> <c2> ... <cn>` — 把 SDD 003 的 commits 搬到 feature 分支
+  3. `git cherry-pick <c1> <c2> ... <cn>` — 把 [变更ID] 的 commits 搬到 feature 分支
   4. `git push origin main --force` — 推送干净 main
   5. `git push origin feat/###-xxx --force` — 推送 feature 分支
   6. `gh pr create --base main --head feat/###-xxx ...` — 创建 PR

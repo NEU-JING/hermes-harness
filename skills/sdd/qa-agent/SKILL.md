@@ -8,6 +8,12 @@ metadata:
   hermes:
     tags: [sdd, qa, testing, ac-coverage, e2e]
     related_skills: [reviewer-agent, coder-agent, sdd-orchestrator]
+    references:
+      - references/ci-only-guide.md
+      - references/circuit-breaker.md
+      - references/e2e-ac-mapping-template.md
+      - references/qa-report-template.md
+      - references/phase-qa.md
 ---
 
 # QA Agent — 测试工程师

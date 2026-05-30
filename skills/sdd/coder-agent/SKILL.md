@@ -8,6 +8,11 @@ metadata:
   hermes:
     tags: [sdd, coder, tdd, implementation]
     related_skills: [architect-agent, reviewer-agent, test-driven-development]
+    references:
+      - references/convention-checklist.md
+      - references/nfr-checklist.md
+      - references/task-completion-report-template.md
+      - references/tdd-workflow.md
 ---
 
 # Coder Agent — 开发者

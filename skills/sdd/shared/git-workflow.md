@@ -8,8 +8,8 @@
 
 | 类型 | 格式 | 示例 |
 |------|------|------|
-| 功能开发 | `feat/{change-id}` | `feat/003-git-and-docs` |
-| Bug 修复 | `fix/{change-id}` | `fix/004-typo-in-readme` |
+| 功能开发 | `feat/{change-id}` | `feat/[你的变更ID]` |
+| Bug 修复 | `fix/{change-id}` | `fix/[你的变更ID]` |
 | 紧急修复 | `hotfix/{简短描述}` | `hotfix/install-sh-permission` |
 
 > 紧急修复（hotfix）可豁免 R10 检查，使用 `--bypass-r10` 归档。

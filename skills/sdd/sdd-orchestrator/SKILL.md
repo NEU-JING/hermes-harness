@@ -8,6 +8,11 @@ metadata:
   hermes:
     tags: [sdd, orchestrator, workflow, gate, archive]
     related_skills: [sdd-init, sdd-structure-lint, po-agent, ba-agent, architect-agent, coder-agent, reviewer-agent, qa-agent]
+    references:
+      - references/sdd-workflow-activation-check.md
+      - references/incremental-mode.md
+      - references/pr-and-review-flow.md
+      - references/quick-flow-phase-gates.md
 ---
 
 # SDD Orchestrator — 编排器
@@ -277,7 +282,7 @@ effective_rules = [r for r in R1_R10 if r.id not in disable_rules]
 
 ```json
 {
-  "change_id": "002-ailp-v4-refactor",
+  "change_id": "[你的变更ID]",
   "flow_level": "Standard",
   "current_phase": "coder",
   "current_sub_phase": "phase_2_tutor",
