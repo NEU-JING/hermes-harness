@@ -183,6 +183,26 @@ metadata:
 }
 ```
 
+**增量模式字段**（SDD 004 新增）：
+```json
+{
+  "incremental_mode": true,
+  "current_sub_phase": "phase_2_core",
+  "sub_phases_completed": ["phase_1_data"],
+  "phase_status": {
+    "phase_1_data": {
+      "status": "qa_passed",
+      "ac_covered": ["AC1-AC5"],
+      "completed_at": "2026-05-30T10:00:00Z"
+    },
+    "phase_2_core": {
+      "status": "in_progress",
+      "depends_on": ["phase_1_data"]
+    }
+  }
+}
+```
+
 **增强字段**（SDD 003 新增）：
 - `review_round`：Reviewer 回退轮次计数
 - `previous_review_outcome`：上一轮 Review 结论
@@ -278,6 +298,26 @@ UA → ARV:    用户明确确认
   → Step 8.5: 输出归档摘要
 ```
 
+### 5.4 增量模式数据流（SDD 004 新增）
+
+```
+Architect 产出 tasks.md（含 Phase 标记）
+  → Coder Phase 1 Coding → Phase 1 Review → Phase 1 QA → 用户确认 Phase 1
+    ↓（用户选择继续）
+  → Coder Phase 2 Coding → Phase 2 Review → Phase 2 QA → 用户确认 Phase 2
+    ↓
+  → ...
+  → 全部 Phase 验收通过 → 归档（含所有 Phase Review/QA 报告）
+```
+
+**Phase 门禁检查**：
+```
+Phase N 开始前
+  → 检查 .sdd-state.json phase_status[Phase N-1].status == "accepted"
+  → 依赖满足 → 继续
+  → 依赖不满足 → 阻断，提示"请先完成 Phase N-1"
+```
+
 ---
 
 ## 6. 安装机制
@@ -313,3 +353,6 @@ UA → ARV:    用户明确确认
 | **sdd-init 分 init/upgrade 双模式** | 覆盖新项目和存量项目两种场景 | 仅 init 模式 → 无法接入存量项目 |
 | **R10 用纯 git 命令检测** | 不依赖外部文件加载，归档前直接执行 | 加载 git-workflow.md 检查 → 增加失败面 |
 | **.sdd-state.json 持久化** | 支持 Agent 重启后从中断点恢复 | 内存状态 → 重启丢失进度 |
+| **Phase 级交付** | 大型重构可早期验证方向，降低返工成本 | 线性瀑布 → 问题发现晚、返工成本高 |
+| **Phase 状态机** | `phase_status` 字段明确追踪各 Phase 生命周期 | 无状态追踪 → 依赖关系混乱 |
+| **Phase 门禁前置** | 开始前检查依赖，防止非法状态推进 | 后置检查 → 发现问题时已执行大量工作 |
