@@ -1,6 +1,0 @@
----
-name: test
-sdd_config:
-  role_to_profile:
-    po: "sdd-pro"
-    coder: "sdd-flash"
