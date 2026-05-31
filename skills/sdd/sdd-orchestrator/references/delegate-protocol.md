@@ -1,12 +1,13 @@
 # Agent Delegation Protocol
 
-> **版本**: 2.0.2  
-> **日期**: 2026-05-30
+> **版本**: 2.1.0  
+> **日期**: 2026-05-31
 >
 > **更新内容**:
 > - 前置检查移除 orchestrator 预加载 skill 的要求
 > - 改为 Agent 自主加载模式：各 agent 内部负责加载自己的 skill
 > - 明确职责分离：orchestrator 只管调度，agent 管自己的依赖
+> - 新增 profile 可选字段，支持 Profile 委托（v2.1.0）
 
 ---
 
@@ -23,6 +24,7 @@
 ```yaml
 delegate_task:
   goal: "[明确的目标描述]"
+  profile: "sdd-flash"        # v2.1.0 NEW: 可选 Profile 名称
   
   context: |
     ## 变更上下文
@@ -191,6 +193,7 @@ def handle_agent_failure(result: AgentResult, current_state: str):
 ```yaml
 delegate_task:
   goal: "产出PRD文档：定义变更的背景、目标、功能范围、非目标、成功指标、用户场景"
+  profile: "sdd-flash"
   
   context: |
     change_id: "{change_id}"
@@ -231,6 +234,7 @@ delegate_task:
 ```yaml
 delegate_task:
   goal: "根据PRD产出Spec文档：细化需求清单，编写AC（Given-When-Then格式）"
+  profile: "sdd-flash"
   
   context: |
     change_id: "{change_id}"
@@ -279,6 +283,7 @@ delegate_task:
 ```yaml
 delegate_task:
   goal: "根据Spec产出Design文档和Tasks拆分"
+  profile: "sdd-pro"
   
   context: |
     change_id: "{change_id}"
@@ -331,6 +336,7 @@ delegate_task:
 # 为每个Task调用一次
 delegate_task:
   goal: "实现Task {task_id}: {task_name} — 遵循TDD（RED-GREEN-REFACTOR）"
+  profile: "sdd-pro"
   
   context: |
     change_id: "{change_id}"
@@ -405,6 +411,7 @@ for task in tasks:
 ```yaml
 delegate_task:
   goal: "三阶段评审：Spec合规检查、代码质量检查、架构一致性检查"
+  profile: "sdd-reviewer"
   
   context: |
     change_id: "{change_id}"
@@ -475,6 +482,7 @@ delegate_task:
 ```yaml
 delegate_task:
   goal: "执行测试验证：AC覆盖检查、测试执行、环境差异检查"
+  profile: "sdd-flash"
   
   context: |
     change_id: "{change_id}"
@@ -610,3 +618,29 @@ def handle_delegate_failure(error, current_state):
 | Coder | coder-agent | tasks.md + design.md | commits + completion-report.md |
 | Reviewer | reviewer-agent | spec + design + code | review-report.md |
 | QA | qa-agent | spec + review-report | qa-report.md |
+
+---
+
+## Hermes v2.1.0 Profile 扩展
+
+**状态**: 正式（v2.1.0）
+
+### 3 Profile 角色分组
+
+| Profile | 适用角色 | 模型 | 预加载 Skills | 工具集 |
+|:--------|:---------|:-----|:-------------|:-------|
+| `sdd-flash` | PO, BA, QA | `deepseek/deepseek-v4-flash` | po-agent, ba-agent, qa-agent, sdd-orchestrator | file, skills |
+| `sdd-pro` | Architect, Coder | `deepseek/deepseek-v4-pro` | architect-agent, coder-agent, sdd-orchestrator, test-driven-development, local-verifier | file, terminal, skills, github |
+| `sdd-reviewer` | Reviewer | `deepseek/deepseek-v4-pro`（独立会话） | reviewer-agent, sdd-orchestrator, post-coding-review | file, terminal, skills, github |
+
+### Profile 创建
+
+```bash
+# 一键创建 3 个 Profile
+bash scripts/setup-sdd-profiles.sh
+
+# 或手动创建：
+hermes profile create sdd-flash --model deepseek/deepseek-v4-flash --tools file,skills
+hermes profile create sdd-pro --model deepseek/deepseek-v4-pro --tools file,terminal,skills,github
+hermes profile create sdd-reviewer --model deepseek/deepseek-v4-pro --tools file,terminal,skills,github
+```

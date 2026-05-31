@@ -136,3 +136,19 @@
 | R8 | Push 前必过 Pre-commit | pre-commit hook | ✗ | ✗ |
 | R9 | 目标环境通过原则 | qa-agent | ✗ | ✓ |
 | R10 | PR 不直接 push main | sdd-orchestrator | ✓ | ✓ |
+
+---
+
+## ROLE_TO_PROFILE_DEFAULT（编排器 v2.1.0+）
+
+SDD 角色到 Hermes Profile 的默认映射。编排器在委托阶段根据此映射选择 Profile。
+项目可通过 AGENTS.md 的 `sdd_config.role_to_profile` 覆盖指定角色的映射。
+
+| 角色 | 默认 Profile | 说明 |
+|:-----|:------------|:-----|
+| `po` | `sdd-flash` | PRD 文档产出，快模型即可 |
+| `ba` | `sdd-flash` | Spec 文档产出，快模型即可 |
+| `architect` | `sdd-pro` | 技术设计，需高质量模型 |
+| `coder` | `sdd-pro` | 编码实现，需高质量模型 |
+| `reviewer` | `sdd-reviewer` | 独立评审，需高质量模型 + 独立会话 |
+| `qa` | `sdd-flash` | 测试验证，快模型即可 |

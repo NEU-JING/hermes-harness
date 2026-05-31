@@ -29,3 +29,14 @@
 - convention_overrides:
     tasks_split_rule: "按角色 Skill 拆分，每个 Skill 是一个 Task"
     output_format: "SKILL.md（YAML frontmatter + Markdown body）"
+
+## SDD Profile 覆盖（可选）
+
+# Hermes v2.1.0+ 支持基于 Profile 的多 Agent 委托。
+# 不声明此段 = 使用 skills/sdd/shared/sdd-rules.md 中的默认映射。
+# 声明后只覆盖指定角色，未覆盖角色继续使用默认值。
+# 示例：
+# sdd_config:
+#   role_to_profile:
+#     po: "sdd-pro"        # 将 PO 升级为 pro 模型
+#     coder: "sdd-flash"   # 将 Coder 降级为 flash（不推荐）

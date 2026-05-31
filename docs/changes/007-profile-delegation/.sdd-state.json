@@ -1,0 +1,9 @@
+{
+  "change_id": "007-profile-delegation",
+  "flow_level": "Standard",
+  "current_state": "ARCHITECT_DONE",
+  "phases_completed": ["po", "ba", "architect"],
+  "description": "基于Hermes v2.1.0 profile特性升级SDD委托协议，实现多Agent协作",
+  "started_at": "2026-05-31T17:30:00Z",
+  "updated_at": "2026-05-31T18:35:00Z"
+}

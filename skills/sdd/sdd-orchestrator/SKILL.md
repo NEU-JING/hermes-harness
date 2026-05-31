@@ -1,7 +1,7 @@
 ---
 name: sdd-orchestrator
 description: Central workflow orchestrator for SDD. Enforces strict phase gates, manages state machine transitions, and delegates to role agents via delegate_task.
-version: 2.0.2
+version: 2.1.0
 author: Hermes Agent
 license: MIT
 metadata:
@@ -16,7 +16,7 @@ metadata:
       - references/interrupt-recovery.md
 ---
 
-# SDD Orchestrator v2.0.2 — 严格状态机编排器
+# SDD Orchestrator v2.1.0 — 严格状态机编排器
 
 ## Overview
 
@@ -149,6 +149,7 @@ metadata:
 ```yaml
 delegate_task:
   goal: "[当前阶段目标]"
+  profile: "sdd-flash"         # v2.1.0 NEW: 可选 Hermes Profile 名称
   context: |
     # 当前变更上下文
     change_id: "{change_id}"
@@ -287,6 +288,55 @@ def phase_gate_transition(current_state, next_state):
 | `USER_ACCEPT` | "归档" | → `ARCHIVE_ENTRY` |
 | 任意等待状态 | "状态" | 输出当前状态和产物 |
 | 任意状态 | "中断" | 保存状态，可恢复 |
+
+---
+
+## Hermes v2.1.0 Profile 委托集成
+
+编排器 v2.1.0 利用 Hermes Profile 隔离能力实现角色分组的模型分级委托。3 个 Profile 覆盖 6 个 SDD 角色：
+
+### Profile 总览
+
+| Profile | 适用角色 | 模型 | 工具集 |
+|:--------|:---------|:-----|:-------|
+| `sdd-flash` | PO, BA, QA | `deepseek/deepseek-v4-flash` | `file`, `skills` |
+| `sdd-pro` | Architect, Coder | `deepseek/deepseek-v4-pro` | `file`, `terminal`, `skills`, `github` |
+| `sdd-reviewer` | Reviewer | `deepseek/deepseek-v4-pro` | `file`, `terminal`, `skills`, `github` |
+
+### Role → Profile 默认映射
+
+定义在 `skills/sdd/shared/sdd-rules.md` 的 `ROLE_TO_PROFILE_DEFAULT` 常量中：
+
+| 角色 | Profile |
+|:-----|:--------|
+| `po` | `sdd-flash` |
+| `ba` | `sdd-flash` |
+| `architect` | `sdd-pro` |
+| `coder` | `sdd-pro` |
+| `reviewer` | `sdd-reviewer` |
+| `qa` | `sdd-flash` |
+
+### 委托流程
+
+编排器在 `delegate_agent()` 前调用 `get_profile_for_role(role)` 解析 Profile：
+
+1. 从 `shared/sdd-rules.md` 加载 `ROLE_TO_PROFILE_DEFAULT`
+2. 检查 `AGENTS.md` 是否有 `sdd_config.role_to_profile` 覆盖
+3. 浅合并覆盖到默认映射
+4. 查找 role → profile 映射
+5. 验证 Profile 存在（`hermes profile list`）
+6. 将 profile 名称传入 `delegate_task`
+
+### Profile 创建
+
+```bash
+# 一键创建 3 个 Profile
+bash scripts/setup-sdd-profiles.sh
+```
+
+### 向后兼容
+
+AGENTS.md 无 `role_to_profile` 配置时，`delegate_task` 不携带 `profile` 参数，行为与 v2.0.3 完全一致。
 
 ---
 

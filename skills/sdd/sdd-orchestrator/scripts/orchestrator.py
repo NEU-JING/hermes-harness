@@ -1,12 +1,13 @@
 #!/usr/bin/env python3
 """
-SDD Orchestrator v2.0 - 严格状态机编排器
+SDD Orchestrator v2.1 - 严格状态机编排器
 
 职责：
 1. 状态管理：维护 .sdd-state.json，驱动状态机推进
 2. 门禁强制：每个状态转换必须通过对应Level的lint检查
 3. Agent委托：使用 delegate_task 实际调度各角色Agent
 4. 流程管控：任何偏离都阻断，必须修复后才能继续
+5. Profile解析（v2.1.0）：根据角色解析Hermes Profile实现模型分级委托
 
 用法:
     python orchestrator.py start "变更描述" [--quick|--enhanced]
@@ -81,6 +82,16 @@ STATE_AGENT_MAP = {
     State.QA_ENTRY: "qa-agent",
 }
 
+# Role 映射（用于 Profile 选择）
+STATE_ROLE_MAP = {
+    State.PO_ENTRY: "po",
+    State.BA_ENTRY: "ba",
+    State.ARCHITECT_ENTRY: "architect",
+    State.CODER_ENTRY: "coder",
+    State.REVIEWER_ENTRY: "reviewer",
+    State.QA_ENTRY: "qa",
+}
+
 # 状态转换表
 TRANSITIONS = {
     State.IDLE: [(State.PO_ENTRY, True)],  # (target_state, auto)
@@ -139,9 +150,9 @@ class SDDState:
     metadata: Dict
 
 class SDDOrchestrator:
-    """SDD编排器核心类 v2.0.0"""
+    """SDD编排器核心类 v2.1.0"""
     
-    VERSION = "2.0.0"
+    VERSION = "2.1.0"
     
     def __init__(self, project_root: str = "."):
         self.project_root = Path(project_root)
@@ -252,6 +263,97 @@ class SDDOrchestrator:
             return "Quick"
         else:
             return "Standard"
+
+    # Profile 默认映射（来自 shared/sdd-rules.md）
+    ROLE_TO_PROFILE_DEFAULT = {
+        "po": "sdd-flash",
+        "ba": "sdd-flash",
+        "architect": "sdd-pro",
+        "coder": "sdd-pro",
+        "reviewer": "sdd-reviewer",
+        "qa": "sdd-flash",
+    }
+
+    def load_profile_mapping(self) -> Dict[str, str]:
+        """加载合并后的 role→profile 映射（默认 + AGENTS.md 覆盖）。
+
+        Returns:
+            Dict[str, str]: 合并后的 role→profile 映射
+        """
+        mapping = dict(self.ROLE_TO_PROFILE_DEFAULT)
+
+        # 尝试从 AGENTS.md 加载覆盖
+        agents_path = self.project_root / "AGENTS.md"
+        if agents_path.exists():
+            try:
+                import re
+                content = agents_path.read_text()
+                # 简单解析 sdd_config.role_to_profile 段
+                # 格式: po: "sdd-flash"
+                in_section = False
+                for line in content.split("\n"):
+                    if "role_to_profile:" in line:
+                        in_section = True
+                        continue
+                    if in_section:
+                        if line.strip() == "" or line.startswith("#"):
+                            if line.strip() == "":
+                                in_section = False
+                            continue
+                        match = re.match(r'\s*(\w+):\s*"([^"]+)"', line)
+                        if match:
+                            role, profile = match.groups()
+                            mapping[role] = profile
+                        else:
+                            in_section = False
+            except Exception as e:
+                print(f"⚠️  解析 AGENTS.md 失败: {e}，使用默认映射")
+
+        return mapping
+
+    def get_profile_for_role(self, role: str) -> Optional[str]:
+        """根据角色返回 Profile 名称。
+
+        Args:
+            role: 角色标识 (po/ba/architect/coder/reviewer/qa)
+
+        Returns:
+            Profile 名称，或 None（回退模式）
+        """
+        mapping = self.load_profile_mapping()
+        profile = mapping.get(role)
+
+        if not profile:
+            print(f"⚠️  角色 '{role}' 未在映射中找到，回退到无 Profile 模式")
+            return None
+
+        if not self._check_profile_exists(profile):
+            print(f"⚠️  Profile '{profile}' 不存在。运行 'bash scripts/setup-sdd-profiles.sh' 创建。")
+            return None
+
+        return profile
+
+    def _check_profile_exists(self, profile_name: str) -> bool:
+        """检查 Hermes Profile 是否存在。
+
+        Args:
+            profile_name: Profile 名称
+
+        Returns:
+            True 如果 Profile 存在
+        """
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["hermes", "profile", "list"],
+                capture_output=True,
+                text=True,
+                timeout=5,
+            )
+            return profile_name in result.stdout
+        except Exception:
+            # hermes 命令不可用，假设 Profile 不存在
+            return False
 
     def execute_lint(self, level: str, change_id: str) -> Tuple[bool, List[str]]:
         """执行lint检查"""
@@ -397,12 +499,19 @@ class SDDOrchestrator:
         return True
 
     def delegate_agent(self, change_id: str, state: State):
-        """委托Agent执行任务"""
+        """委托Agent执行任务（v2.1.0: 支持 Profile 感知委托）"""
         agent_skill = STATE_AGENT_MAP.get(state)
         if not agent_skill:
             return
 
-        print(f"\n📤 委托 {agent_skill} 执行任务...")
+        # v2.1.0: Profile 解析
+        role = STATE_ROLE_MAP.get(state)
+        profile = self.get_profile_for_role(role) if role else None
+
+        if profile:
+            print(f"\n🔷 委托 {agent_skill} → Profile: {profile}")
+        else:
+            print(f"\n📤 委托 {agent_skill}（无 Profile，使用默认模式）")
 
         # 构建委托上下文
         change_dir = self.changes_dir / change_id
@@ -434,12 +543,13 @@ class SDDOrchestrator:
 ━━━━━━━━━━━━━━━━━━━━
 委托详情:
   Skill: {agent_skill}
+  Profile: {profile or 'default'}   # v2.1.0
   Goal: 产出{state.state_name.replace('_ENTRY', '').replace('_', ' ')}阶段产物
   Context:
 {json.dumps(context, indent=4)}
 ━━━━━━━━━━━━━━━━━━━━
 
-注: 实际应调用 delegate_task(skill='{agent_skill}', context=...)
+注: 实际应调用 delegate_task(skill='{agent_skill}', profile='{profile or ""}', context=...)
 此处仅演示状态机推进逻辑。
 """)
 

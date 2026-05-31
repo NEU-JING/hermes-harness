@@ -180,6 +180,9 @@ test -f .git/hooks/post-commit && echo "检查来源" || echo "📁 新建文件
 
 # 10: conftest.py SDD 块
 grep -q "# SDD: CI-only" conftest.py 2>/dev/null && echo "不变文件" || echo "📝 需更新"
+
+# 11: Hermes Profile
+hermes profile list 2>/dev/null | grep -c "sdd-" && echo "✓" || echo "📁 需创建"
 ```
 
 ### Step B2: 生成升级计划
@@ -194,6 +197,7 @@ grep -q "# SDD: CI-only" conftest.py 2>/dev/null && echo "不变文件" || echo 
 | AGENTS.md | 已存在 | 不变 |
 | CONSTITUTION.md | 不存在 | 📁 新建 |
 | .pre-commit-config.yaml | 存在，来源非 SDD | ⚠️ 冲突 |
+| Hermes Profiles | $(检测结果) | $(操作) |
 ```
 
 ### Step B3: 用户确认
@@ -207,6 +211,31 @@ grep -q "# SDD: CI-only" conftest.py 2>/dev/null && echo "不变文件" || echo 
 - 不变文件 → 跳过
 - 冲突项 → 按用户选择处理（保留/覆盖/合并）
 - 需更新文件 → 追加缺失内容
+
+### Step B4.x: 创建 SDD Profiles（Hermes v2.1.0+）
+
+**前置条件**：`hermes --version` ≥ 2.1.0
+
+1. 检测 Hermes 版本：
+   ```bash
+   hermes --version 2>/dev/null | grep -oP 'v?\K\d+\.\d+'
+   ```
+
+2. 版本 ≥ 2.1.0 时执行 Profile 创建脚本：
+   ```bash
+   bash scripts/setup-sdd-profiles.sh
+   ```
+
+3. 验证创建结果：
+   ```bash
+   hermes profile list | grep "sdd-"
+   # 预期：sdd-flash, sdd-pro, sdd-reviewer 三个 Profile
+   ```
+
+**降级处理**：
+- `hermes` 命令不可用 → 输出 "❌ hermes 未安装，跳过 Profile 创建"
+- 版本 < 2.1.0 → 输出 "⚠️  Hermes 版本过低，请升级到 v2.1.0+ 以启用 Profile 委托"
+- Profile 已存在 → 输出 "⏭️  Profile '{name}' 已存在，跳过"
 
 ### Step B5: 验证 + 摘要
 

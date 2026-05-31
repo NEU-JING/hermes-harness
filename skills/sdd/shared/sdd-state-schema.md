@@ -32,7 +32,24 @@
     "phase_status": { "$ref": "#/definitions/PhaseStatusMap" },
     "incremental_mode": { "type": "boolean", "default": false },
     "started_at": { "type": "string", "format": "date-time" },
-    "updated_at": { "type": "string", "format": "date-time" }
+    "updated_at": { "type": "string", "format": "date-time" },
+    "profile": {
+      "type": "string",
+      "description": "当前委托阶段使用的 Hermes Profile 名称。仅在启用 Profile 模式时存在。",
+      "examples": ["sdd-flash", "sdd-pro", "sdd-reviewer"]
+    },
+    "profile_history": {
+      "type": "array",
+      "description": "各阶段使用的 Profile 历史记录",
+      "items": {
+        "type": "object",
+        "properties": {
+          "state": { "type": "string", "description": "阶段状态名" },
+          "profile": { "type": "string", "description": "使用的 Profile 名称" },
+          "resolved_at": { "type": "string", "format": "date-time", "description": "解析时间" }
+        }
+      }
+    }
   }
 }
 ```
@@ -193,6 +210,8 @@
 | `incremental_mode` | boolean | ❌ | 是否启用增量模式（默认 false） |
 | `started_at` | string | ✅ | 变更开始时间（ISO 8601） |
 | `updated_at` | string | ✅ | 最后更新时间（ISO 8601） |
+| `profile` | string | ❌ | 当前委托阶段使用的 Hermes Profile 名称（可选） |
+| `profile_history` | array | ❌ | 各阶段使用的 Profile 历史记录 |
 
 ### PhaseStatus 字段
 
