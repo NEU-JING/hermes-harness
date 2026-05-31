@@ -27,16 +27,15 @@ echo "📋 Hermes 版本: ${HERMES_VERSION}"
 
 create_profile() {
     local name=$1
-    local model=$2
-    local tools=$3
+    local desc=$2
 
-    if hermes profile list 2>/dev/null | grep -q "$name"; then
+    if hermes profile list 2>/dev/null | grep -q "^[[:space:]]*${name}[[:space:]]"; then
         echo -e "   ${YELLOW}⏭️${NC}  Profile '${name}' 已存在，跳过"
         return 0
     fi
 
     echo -e "   ${GREEN}📁${NC} 创建 Profile: ${name}"
-    if hermes profile create "$name" --model "$model" --tools "$tools" 2>/dev/null; then
+    if hermes profile create "$name" --description "$desc" 2>/dev/null; then
         echo -e "   ${GREEN}✅${NC} Profile '${name}' 创建成功"
     else
         echo -e "   ${RED}❌${NC} Profile '${name}' 创建失败"
@@ -49,19 +48,13 @@ echo "创建 SDD Profiles..."
 echo ""
 
 # sdd-flash: 文档密集型 (PO/BA/QA)
-create_profile "sdd-flash" \
-    "deepseek/deepseek-v4-flash" \
-    "file,skills" || true
+create_profile "sdd-flash" "SDD 文档密集型角色 (PO/BA/QA) - 快模型" || true
 
 # sdd-pro: 编码密集型 (Architect/Coder)
-create_profile "sdd-pro" \
-    "deepseek/deepseek-v4-pro" \
-    "file,terminal,skills,github" || true
+create_profile "sdd-pro" "SDD 编码密集型角色 (Architect/Coder) - 高质量模型" || true
 
 # sdd-reviewer: 独立评审 (Reviewer)
-create_profile "sdd-reviewer" \
-    "deepseek/deepseek-v4-pro" \
-    "file,terminal,skills,github" || true
+create_profile "sdd-reviewer" "SDD 独立评审角色 (Reviewer) - 高质量模型 + 独立会话" || true
 
 echo ""
 echo "=== Profile 创建摘要 ==="
