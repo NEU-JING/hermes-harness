@@ -1,9 +1,34 @@
 {
   "change_id": "007-profile-delegation",
   "flow_level": "Standard",
-  "current_state": "ARCHITECT_DONE",
-  "phases_completed": ["po", "ba", "architect"],
-  "description": "基于Hermes v2.1.0 profile特性升级SDD委托协议，实现多Agent协作",
+  "incremental_mode": false,
+  "current_state": "REVIEWER_ENTRY",
+  "previous_state": "CODER_CHECK",
+  "state_history": [
+    {
+      "from_state": "ARCHITECT_DONE",
+      "to_state": "CODER_ENTRY",
+      "at": "2026-05-31T14:14:57.614876Z",
+      "trigger": "manual",
+      "auto": false
+    },
+    {
+      "from_state": "CODER_ENTRY",
+      "to_state": "CODER_CHECK",
+      "at": "2026-05-31T14:15:01.595748Z",
+      "trigger": "manual",
+      "auto": true
+    },
+    {
+      "from_state": "CODER_CHECK",
+      "to_state": "REVIEWER_ENTRY",
+      "at": "2026-05-31T14:15:01.657652Z",
+      "trigger": "manual",
+      "auto": true
+    }
+  ],
+  "lint_results": {},
   "started_at": "2026-05-31T17:30:00Z",
-  "updated_at": "2026-05-31T18:35:00Z"
+  "updated_at": "2026-05-31T14:15:01.657671Z",
+  "metadata": {}
 }

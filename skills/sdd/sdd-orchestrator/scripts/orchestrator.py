@@ -188,7 +188,7 @@ class SDDOrchestrator:
             started_at=now,
             updated_at=now,
             metadata={
-                "orchestrator_version": "2.0.0",
+                "orchestrator_version": self.VERSION,
                 "description": description,
             }
         )
@@ -277,38 +277,44 @@ class SDDOrchestrator:
     def load_profile_mapping(self) -> Dict[str, str]:
         """加载合并后的 role→profile 映射（默认 + AGENTS.md 覆盖）。
 
-        Returns:
-            Dict[str, str]: 合并后的 role→profile 映射
-        """
-        mapping = dict(self.ROLE_TO_PROFILE_DEFAULT)
+        AC10: AGENTS.md 无非注释 role_to_profile 配置时返回空映射
+        （不启用 Profile 模式，保持向后兼容）。
 
-        # 尝试从 AGENTS.md 加载覆盖
+        Returns:
+            Dict[str, str]: 合并后的 role→profile 映射，或空 dict（未启用）
+        """
+        # 检查 AGENTS.md 是否明确启用了 Profile 模式
         agents_path = self.project_root / "AGENTS.md"
+        has_user_overrides = False
+        agents_overrides = {}
+
         if agents_path.exists():
             try:
                 import re
                 content = agents_path.read_text()
-                # 简单解析 sdd_config.role_to_profile 段
-                # 格式: po: "sdd-flash"
-                in_section = False
+                # 搜索 sdd_config.role_to_profile 段中的非注释映射行
                 for line in content.split("\n"):
-                    if "role_to_profile:" in line:
-                        in_section = True
+                    stripped = line.strip()
+                    # 跳过注释行和空行
+                    if stripped.startswith("#") or stripped == "":
                         continue
-                    if in_section:
-                        if line.strip() == "" or line.startswith("#"):
-                            if line.strip() == "":
-                                in_section = False
-                            continue
-                        match = re.match(r'\s*(\w+):\s*"([^"]+)"', line)
-                        if match:
-                            role, profile = match.groups()
-                            mapping[role] = profile
-                        else:
-                            in_section = False
+                    match = re.match(r'\s*(\w+):\s*"([^"]+)"', line)
+                    if match:
+                        role, profile = match.groups()
+                        # 排除 sdd_config 和 role_to_profile 本身
+                        if role not in ("sdd_config", "role_to_profile"):
+                            agents_overrides[role] = profile
+                            has_user_overrides = True
             except Exception as e:
                 print(f"⚠️  解析 AGENTS.md 失败: {e}，使用默认映射")
 
+        # AC10: 无用户覆盖时返回空映射（不启用 Profile 模式）
+        if not has_user_overrides:
+            return {}
+
+        # 有覆盖时：默认 + 覆盖浅合并
+        mapping = dict(self.ROLE_TO_PROFILE_DEFAULT)
+        mapping.update(agents_overrides)
         return mapping
 
     def get_profile_for_role(self, role: str) -> Optional[str]:
@@ -674,7 +680,7 @@ class SDDOrchestrator:
 
 
 def main():
-    parser = argparse.ArgumentParser(description="SDD Orchestrator v2.0")
+    parser = argparse.ArgumentParser(description="SDD Orchestrator v2.1")
     subparsers = parser.add_subparsers(dest="command", help="命令")
 
     # start 命令
