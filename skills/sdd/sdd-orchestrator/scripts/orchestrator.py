@@ -292,17 +292,30 @@ class SDDOrchestrator:
             try:
                 import re
                 content = agents_path.read_text()
+                # 有效角色集合（防止误匹配 convention_overrides 等段）
+                valid_roles = {"po", "ba", "architect", "coder", "reviewer", "qa"}
                 # 搜索 sdd_config.role_to_profile 段中的非注释映射行
+                in_profile_section = False
                 for line in content.split("\n"):
                     stripped = line.strip()
                     # 跳过注释行和空行
                     if stripped.startswith("#") or stripped == "":
                         continue
+                    # 检测 role_to_profile 段入口
+                    if "role_to_profile:" in stripped:
+                        in_profile_section = True
+                        continue
+                    if in_profile_section:
+                        # 遇到下一个顶级 key 则退出段
+                        if stripped.endswith(":") and not stripped.startswith(" "):
+                            in_profile_section = False
+                            continue
+                    if not in_profile_section:
+                        continue
                     match = re.match(r'\s*(\w+):\s*"([^"]+)"', line)
                     if match:
                         role, profile = match.groups()
-                        # 排除 sdd_config 和 role_to_profile 本身
-                        if role not in ("sdd_config", "role_to_profile"):
+                        if role in valid_roles:
                             agents_overrides[role] = profile
                             has_user_overrides = True
             except Exception as e:

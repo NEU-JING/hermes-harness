@@ -2,8 +2,8 @@
   "change_id": "007-profile-delegation",
   "flow_level": "Standard",
   "incremental_mode": false,
-  "current_state": "REVIEWER_ENTRY",
-  "previous_state": "CODER_CHECK",
+  "current_state": "QA_ENTRY",
+  "previous_state": "REVIEWER_CHECK",
   "state_history": [
     {
       "from_state": "ARCHITECT_DONE",
@@ -25,10 +25,24 @@
       "at": "2026-05-31T14:15:01.657652Z",
       "trigger": "manual",
       "auto": true
+    },
+    {
+      "from_state": "REVIEWER_ENTRY",
+      "to_state": "REVIEWER_CHECK",
+      "at": "2026-05-31T14:36:43.061587Z",
+      "trigger": "manual",
+      "auto": true
+    },
+    {
+      "from_state": "REVIEWER_CHECK",
+      "to_state": "QA_ENTRY",
+      "at": "2026-05-31T14:36:51.849481Z",
+      "trigger": "manual",
+      "auto": true
     }
   ],
   "lint_results": {},
   "started_at": "2026-05-31T17:30:00Z",
-  "updated_at": "2026-05-31T14:15:01.657671Z",
+  "updated_at": "2026-05-31T14:36:51.849501Z",
   "metadata": {}
 }
