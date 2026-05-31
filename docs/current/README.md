@@ -1,6 +1,6 @@
 # Hermes Harness — 项目基线
 
-> 最后更新：2026-05-30
+> 最后更新：2026-05-31
 > 当前版本：参考 `main` 分支最新 commit
 > 本文档由 SDD 归档流程自动维护（sdd-orchestrator Phase 8.1）
 
@@ -12,8 +12,9 @@
 - **增量交付**：支持（新增 Phase 级独立交付）
 - **角色 Skill**：8 个（po-agent, ba-agent, architect-agent, coder-agent, reviewer-agent, qa-agent, sdd-orchestrator, sdd-init）
 - **辅助 Skill**：1 个（sdd-structure-lint）
-- **已归档变更**：7（001-007）
+- **已归档变更**：8（001-008）
 - **通用化状态**：✅ 已完成（移除 AILP 特定引用，所有 references 文件已在 SKILL.md frontmatter 中声明）
+- **Profile 委托**：✅ v2.1.0（3 个 Profile 覆盖 6 个 SDD 角色，AGENTS.md opt-in）
 
 ---
 
@@ -88,6 +89,7 @@ Hermes Agent
 | 006-orchestrator-v2 | SDD Orchestrator v2.0 重构 | SKILL.md重写 + 6 references + orchestrator.py 可执行脚本 | 2026-05-30 |
 | 007-orchestrator-refine | SDD Orchestrator v2.0.1 优化 | SKILL.md精简(-29%) + delegate-protocol新增前置检查(skill_view强制) | 2026-05-30 |
 | 007-orchestrator-refine-v2.0.2 | SDD Orchestrator v2.0.2 快速修复 | 改为 Agent 自主加载模式（orchestrator 不预加载 skill） | 2026-05-30 |
+| 008-profile-delegation | SDD Orchestrator v2.1.0 Profile 委托集成 | 3-Profile 设计 + 委托协议 + orchestrator.py 改造 | 2026-05-31 |
 
 ---
 
