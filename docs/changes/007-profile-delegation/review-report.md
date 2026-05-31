@@ -246,12 +246,19 @@ if "role_to_profile:" in line and not line.strip().startswith("#"):
 
 ---
 
-## 下一步行动
+## 修复验证（commit 1f1c0c7）
 
-1. **必须修复** CRITICAL #1：增加 opt-in gating 逻辑
-2. **应修复** MAJOR #2, #3：同步版本号
-3. **建议修复** MINOR #4, #5：增强解析器健壮性
-4. 修复后重新运行 Reviewer Agent 验证
+**全部问题已在 Coder 阶段修复并提交**（commit `1f1c0c7`）。
+
+| 问题 | 状态 | 修复方式 |
+|:---:|:----:|:---------|
+| 🔴 CRITICAL #1: AC10 向后兼容 | ✅ **已修复** | `load_profile_mapping()` 返回空映射（无 opt-in 时），添加 AC10 文档注释 |
+| 🟠 MAJOR #2: 初始化版本号硬编码 | ✅ **已修复** | `"orchestrator_version": self.VERSION`（动态引用） |
+| 🟠 MAJOR #3: CLI 描述版本号 | ✅ **已修复** | `v2.0` → `v2.1` |
+| 🟡 MINOR #4: 注释行匹配 | ✅ **已修复** | 解析逻辑已重写：跳过注释行 + 排除 key 名 |
+| 🟡 MINOR #5: 空行退出策略 | ✅ **已修复** | 不再用段解析策略，改为全文件非注释行扫描 |
+
+**仲裁结论：✅ 通过**
 
 ---
 
