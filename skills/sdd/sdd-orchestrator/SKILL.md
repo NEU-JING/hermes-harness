@@ -30,60 +30,15 @@ metadata:
 
 ---
 
-## State Machine（状态机）
-
-### Standard 流程状态图
-
-```
-┌─────────┐    init     ┌─────────┐   lint L1   ┌─────────┐
-│  IDLE   │ ──────────▶ │   PO    │ ──────────▶ │  PO_    │
-│ (start) │             │ (entry) │             │ CHECK   │
-└─────────┘             └────┬────┘             └────┬────┘
-                             │                        │
-                             │ delegate po-agent      │ lint pass?
-                             │ ◀──────────────────────┘
-                             │ NO: retry/block
-                             │ YES: proceed
-                             ▼
-                       ┌─────────┐    user     ┌─────────┐
-                       │  PO_    │ ──────────▶ │   BA    │
-                       │  DONE   │   confirm   │ (entry) │
-                       └────┬────┘             └────┬────┘
-                            │                       │
-                            ▼                       ▼
-                      [prd.md created]        [lint + delegate
-                                                ba-agent]
-
-┌─────────┐   user    ┌─────────┐   lint    ┌─────────┐   delegate   ┌─────────┐
-│   BA    │ ────────▶ │  BA_    │ ───────▶ │ARCHITECT│ ───────────▶ │ ARCH_   │
-│  DONE   │ confirm   │ CHECK   │  pass   │ (entry)  │ architect-   │ CHECK   │
-└─────────┘           └─────────┘         └────┬────┘   agent       └────┬────┘
-                                               │                        │
-                                               ▼                        ▼
-                                         [design.md +              [lint pass?
-                                          tasks.md created]          user confirm?]
-┌─────────┐   lint    ┌─────────┐   delegate   ┌─────────┐   lint    ┌─────────┐
-│ CODER   │ ───────▶ │ CODER_  │ ───────────▶ │REVIEWER │ ───────▶ │ REVIEW_ │
-│(entry)  │  L2.5    │ CHECK   │  reviewer-   │(entry)   │  L3      │ CHECK   │
-│         │          │         │  agent       │          │          │         │
-└────┬────┘          └────┬────┘              └────┬────┘          └────┬────┘
-     │                    │                        │                   │
-     │ delegate           │ tasks all done?        │ review passed?    │
-     │ coder-agent        │ NO: continue           │ NO: back to coder │
-     │ (per task)         │ YES: proceed           │ YES: proceed      │
-     ▼                    ▼                        ▼                   ▼
-[commits]           [task reports]          [review-report.md]   [conclusion]
-
-┌─────────┐   lint    ┌─────────┐   delegate   ┌─────────┐   user    ┌─────────┐
-│   QA    │ ───────▶ │  QA_    │ ───────────▶ │  USER   │ ───────▶ │ARCHIVE_ │
-│(entry)  │  pass   │ CHECK   │   qa-agent   │ACCEPT   │ confirm   │ENTRY    │
-└────┬────┘         └────┬────┘              └────┬────┘           └────┬────┘
-     │                   │                        │                    │
-     │                   │ qa passed?             │                    │ R10 + L3
-     │                   │ NO: back to coder      │                    │
-     │                   │ YES: proceed           │                    ▼
-     ▼                   ▼                        ▼               [archive done]
-[tests run]        [qa-report.md]         [user says "归档"]
+```mermaid
+flowchart TD
+    IDLE["IDLE (start)"] -->|"/sdd start"| PO_ENTRY
+    IDLE -->|"/explore"| EXPLORE["EXPLORE (自由对话)"]
+    EXPLORE -->|"放弃"| IDLE
+    EXPLORE -->|"/sdd start"| PO_ENTRY
+    
+    PO_ENTRY["PO (entry)"] -->|delegate po-agent| PO_DONE_dot["PO_DONE\n等待用户确认"]
+    PO_DONE_dot -->|"继续"| BA_ENTRY["BA (entry)"]
 ```
 
 ### 状态定义摘要
