@@ -495,3 +495,6 @@ def execute_lint(self, level: str, change_id: str):
 - [delegate-protocol.md](./references/delegate-protocol.md) — Agent委托协议（含 skill_view() 要求）
 - [incremental-mode.md](./references/incremental-mode.md) — 增量交付模式
 - [interrupt-recovery.md](./references/interrupt-recovery.md) — 中断恢复机制
+- [delta-spec.md](./references/delta-spec.md) — Delta Spec 操作头定义与合并
+- [design-baseline.md](./references/design-baseline.md) — Design 基线合并指南
+- [telemetry.md](./references/telemetry.md) — Telemetry 匿名统计配置

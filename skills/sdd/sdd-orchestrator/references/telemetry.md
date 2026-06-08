@@ -83,7 +83,7 @@ export HERMES_TELEMETRY_DISABLE=1
 
 | 存储位置 | 说明 | 保留策略 |
 |---------|------|---------|
-| `~/.hermes/telemetry/{change_id}/events.ndjson` | 每 Change 单文件追加 | 60 天后自动清理 |
+| `~/.hermes/telemetry/{change_id}/events.ndjson` | 每 Change 单文件追加 | 30 天后自动清理 |
 | `~/.hermes/telemetry/{change_id}/manifest.json` | 汇总信息 | 同 events.ndjson |
 
 ### 清理

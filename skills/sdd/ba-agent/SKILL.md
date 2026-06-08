@@ -45,7 +45,7 @@ BA Agent 扮演业务分析师角色，接收 PO 产出的 PRD，输出可执行
 ### Step 3: 编写 AC
 
 使用 `skill_view(name='ba-agent', file_path='references/ac-writing-guide.md')` 的规范。
-使用 `skill_view(name='ba-agent', file_path='references/spec-template.md')` 的 Acceptence Criteria 章节格式：
+使用 `skill_view(name='ba-agent', file_path='references/spec-template.md')` 的 Acceptance Criteria 章节格式：
 
 每条 AC 使用 **OpenSpec WHEN/THEN + AND 链** 格式：
 

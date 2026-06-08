@@ -1,0 +1,36 @@
+{
+  "change_id": "003-openspec-improvements",
+  "flow_level": "Standard",
+  "current_state": "REVIEWER_CHECK",
+  "phases_completed": ["po", "ba", "architect", "coder_phase1", "coder_phase2", "coder_phase3", "coder_phase4"],
+  "review_status": "not_passed",
+  "next_action": "Review 打回 Coder 修复，CRITICAL+M1+M2+M3+M4+M5 已修复，等待重新 Review",
+  "updated_at": "2026-06-09",
+  "incremental_mode": true,
+  "phase_config": {
+    "total_phases": 4,
+    "current_phase": "phase_4",
+    "phases": {
+      "phase_1": {
+        "name": "探索模式（/explore Brainstorming 入口）",
+        "status": "coding_done",
+        "depends_on": []
+      },
+      "phase_2": {
+        "name": "Spec 格式迁移（OpenSpec WHEN/THEN）",
+        "status": "coding_done",
+        "depends_on": ["phase_1"]
+      },
+      "phase_3": {
+        "name": "Baseline 迁移 + Spec Delta 语义",
+        "status": "coding_done",
+        "depends_on": ["phase_2"]
+      },
+      "phase_4": {
+        "name": "Telemetry 匿名统计",
+        "status": "coding_done",
+        "depends_on": []
+      }
+    }
+  }
+}
