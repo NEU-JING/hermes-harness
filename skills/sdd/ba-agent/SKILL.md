@@ -44,11 +44,28 @@ BA Agent 扮演业务分析师角色，接收 PO 产出的 PRD，输出可执行
 
 ### Step 3: 编写 AC
 
-使用 `skill_view(name='ba-agent', file_path='references/ac-writing-guide.md')` 的规范：
-- 每条 AC 使用 Given-When-Then 格式
+使用 `skill_view(name='ba-agent', file_path='references/ac-writing-guide.md')` 的规范。
+使用 `skill_view(name='ba-agent', file_path='references/spec-template.md')` 的 Acceptence Criteria 章节格式：
+
+每条 AC 使用 **OpenSpec WHEN/THEN + AND 链** 格式：
+
+```markdown
+#### Scenario AC1: 用户成功登录
+
+- **WHEN** 用户输入正确的邮箱和密码
+- **AND** 点击"登录"按钮
+- **THEN** 页面跳转到 Dashboard
+- **AND** 显示用户昵称
+```
+
+**格式规则**：
+- 场景头：`#### Scenario AC{n}: <场景名称>`
+- 条件列表用 `- **WHEN**` / `- **AND**` / `- **THEN**` 前缀 bullet
+- 多条件用 `- **AND**` 链追加，不重复写 WHEN/THEN
+- 每条 AC 覆盖正常流程、异常流程、边界条件
 - 编号从 AC1 开始连续
 - 确保每条 AC 可独立验证
-- 覆盖正常流程、异常流程、边界条件
+- **不保留** Hermes 原生表格式（| AC | 场景 | Given | When | Then |）
 
 ### Step 4: NFR 细化
 
@@ -69,10 +86,12 @@ BA Agent 扮演业务分析师角色，接收 PO 产出的 PRD，输出可执行
 ## Quality Standards
 
 - [ ] AC 编号连续（AC1, AC2, AC3...）
-- [ ] 每条 AC 使用 Given-When-Then 格式
+- [ ] 每条 AC 使用 `#### Scenario AC{n}:` 场景头 + WHEN/THEN + AND 链格式
+- [ ] 多条件使用 AND 链，不重复写 WHEN/THEN
 - [ ] AC 覆盖正常流程、异常流程、边界条件
 - [ ] AC 数量匹配功能复杂度（Standard: 5-15 条）
 - [ ] NFR 有具体验证方式（非仅"满足"）
+- [ ] **不包含** Hermes 原生表格式（| AC | 场景 | Given | When | Then |）
 
 ## Common Pitfalls
 

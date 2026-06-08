@@ -195,10 +195,36 @@ grep -cE "^## (背景与目标|用户场景|功能范围|非功能需求|验收�
 #### 3.2 Spec AC 编号检查
 
 ```bash
-# AC 编号格式: AC{n}，需连续
-grep -oP "AC\d+" spec.md | sort -t'C' -k2 -n | uniq
+# AC 编号格式: #### Scenario AC{n}: <场景名称>
+# 使用正则提取 AC 编号
+grep -oP '#### Scenario AC\d+:' spec.md | sed 's/#### Scenario AC//' | sed 's/://' | sort -n | uniq
 # 检查：无跳号（如 AC1 AC3 缺 AC2）
 ```
+
+**AC 提取规则**：
+- 正则：`/#### Scenario AC(\d+):/`
+- 提取 AC 编号 + 所属 Requirement（向上查找 `### Requirement:`）
+- 提取 WHEN/THEN/AND 条件内容
+- 检查 AC 编号连续性、不重复
+- **不检查** Hermes 表格式（`| AC | 场景 | Given | When | Then |`）
+
+**验证示例**：
+```markdown
+### Requirement: 用户认证
+
+#### Scenario AC1: 用户成功登录
+
+- **WHEN** 输入正确凭据
+- **AND** 点击登录
+- **THEN** 跳转首页
+
+#### Scenario AC2: 登录失败
+
+- **WHEN** 输入错误密码
+- **THEN** 显示错误提示
+```
+
+✅ AC1, AC2 提取成功
 
 #### 3.3 Design 方案对比检查
 
