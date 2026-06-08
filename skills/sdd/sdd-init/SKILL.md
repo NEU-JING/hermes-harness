@@ -57,6 +57,17 @@ if 'psycopg2' in requirements: database = 'PostgreSQL'
 
 使用 `read_file(path='../../templates/AGENTS.md')` 读取模板文件，替换占位符 `{project_name}` 等，写入项目根目录。
 
+**AGENTS.md 模板中必须包含 telemetry 配置（默认关闭）**：
+
+```yaml
+# Telemetry 匿名统计（默认关闭）
+# 取消注释并设置 enabled: true 以启用
+# telemetry:
+#   enabled: false
+```
+
+如果模板文件不存在，Agent 需动态生成 AGENTS.md 时一并包含上述 telemetry 注释行。
+
 #### Step A2.2: 生成 CONSTITUTION.md
 
 使用 `read_file(path='../../templates/CONSTITUTION.md')` 读取模板文件，写入项目根目录。
@@ -120,8 +131,14 @@ fi
 #### Step A2.6: 创建目录结构
 
 ```bash
-mkdir -p docs/changes docs/current docs/archive
+mkdir -p docs/specs docs/changes docs/current docs/archive
 ```
+
+**说明**：
+- `docs/specs/` — spec 基线目录，按 capability 分文件（`docs/specs/<capability>/spec.md`）
+- `docs/current/` — 非 spec 基线文档（PRD / Design 等）
+- 初始化时 `docs/specs/` 为空，首个 Change 归档时创建第一个 capability spec
+- **不再创建** `docs/current/spec.md`
 
 ### Step A3: 验证
 
@@ -129,7 +146,9 @@ mkdir -p docs/changes docs/current docs/archive
 - AGENTS.md ✓
 - CONSTITUTION.md ✓
 - QUIRKS.md ✓
-- docs/{changes,current,archive}/ ✓
+- docs/{specs,changes,current,archive}/ ✓
+
+**注意**：`docs/specs/` 初始为空目录是正常的，首个 Change 归档时自动创建第一个 capability spec。
 
 ### Step A4: 输出摘要
 
@@ -145,6 +164,7 @@ mkdir -p docs/changes docs/current docs/archive
 - .git/hooks/post-commit
 
 **生成目录**：
+- docs/specs/（新建，空，按 capability 分文件）
 - docs/changes/
 - docs/current/
 - docs/archive/

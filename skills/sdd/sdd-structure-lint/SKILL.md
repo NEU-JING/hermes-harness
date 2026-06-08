@@ -41,6 +41,7 @@ SDD 项目中每个阶段切换前都必须验证产物完整性。sdd-structure
 | AGENTS.md 存在 | `AGENTS.md` | CRITICAL |
 | CONSTITUTION.md 存在 | `CONSTITUTION.md` | MAJOR |
 | QUIRKS.md 存在 | `QUIRKS.md` | MAJOR |
+| specs 基线目录存在 | `docs/specs/` | MAJOR（可空目录） |
 | changes 目录存在 | `docs/changes/` | CRITICAL |
 | current 目录存在 | `docs/current/` | MAJOR |
 | archive 目录存在 | `docs/archive/` | MAJOR |
@@ -54,7 +55,7 @@ for f in AGENTS.md CONSTITUTION.md QUIRKS.md; do
 done
 
 # 目录检查
-for d in docs/changes docs/current docs/archive; do
+for d in docs/specs docs/changes docs/current docs/archive; do
   test -d "$d" && echo "✓ $d/" || echo "✗ MISSING: $d/ (CRITICAL/MAJOR)"
 done
 ```
@@ -286,6 +287,30 @@ if errors:
     exit(1)
 print('✓ All SKILL.md frontmatters valid')
 "
+```
+
+#### 3.8 Delta Spec 操作头格式检查
+
+```bash
+# 检查 Change 内 specs/ 目录的 delta 操作头
+# 只在增量归档前执行（L3）
+specs_dir="docs/changes/${change_id}/specs/"
+
+if [ -d "$specs_dir" ]; then
+    # 检查操作头仅允许：ADDED / MODIFIED / REMOVED / RENAMED
+    for file in $(find "$specs_dir" -name 'spec.md'); do
+        grep -oP '^## (ADDED|MODIFIED|REMOVED|RENAMED) Requirements' "$file" || \
+            echo "✗ MAJOR: $file 缺少合法 delta 操作头"
+        
+        # 检查每个操作头后的 content 非空
+        invalid=$(awk '/^## /{h=$0} /^## (REMOVED|RENAMED)/{next} /^[^#]/{if(NF>0) found=1} END{exit !found}' "$file")
+        if [ $? -ne 0 ]; then
+            echo "✗ MAJOR: $file 包含空操作头（无 content）"
+        fi
+    done
+else
+    echo "ℹ️ 无 delta specs/ 目录，跳过检查"
+fi
 ```
 
 ---
