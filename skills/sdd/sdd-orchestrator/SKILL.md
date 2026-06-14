@@ -14,6 +14,9 @@ metadata:
       - references/delegate-protocol.md
       - references/incremental-mode.md
       - references/interrupt-recovery.md
+      - references/delta-spec.md
+      - references/design-baseline.md
+      - references/telemetry.md
 ---
 
 # SDD Orchestrator v2.1.0 — 严格状态机编排器
@@ -30,60 +33,15 @@ metadata:
 
 ---
 
-## State Machine（状态机）
-
-### Standard 流程状态图
-
-```
-┌─────────┐    init     ┌─────────┐   lint L1   ┌─────────┐
-│  IDLE   │ ──────────▶ │   PO    │ ──────────▶ │  PO_    │
-│ (start) │             │ (entry) │             │ CHECK   │
-└─────────┘             └────┬────┘             └────┬────┘
-                             │                        │
-                             │ delegate po-agent      │ lint pass?
-                             │ ◀──────────────────────┘
-                             │ NO: retry/block
-                             │ YES: proceed
-                             ▼
-                       ┌─────────┐    user     ┌─────────┐
-                       │  PO_    │ ──────────▶ │   BA    │
-                       │  DONE   │   confirm   │ (entry) │
-                       └────┬────┘             └────┬────┘
-                            │                       │
-                            ▼                       ▼
-                      [prd.md created]        [lint + delegate
-                                                ba-agent]
-
-┌─────────┐   user    ┌─────────┐   lint    ┌─────────┐   delegate   ┌─────────┐
-│   BA    │ ────────▶ │  BA_    │ ───────▶ │ARCHITECT│ ───────────▶ │ ARCH_   │
-│  DONE   │ confirm   │ CHECK   │  pass   │ (entry)  │ architect-   │ CHECK   │
-└─────────┘           └─────────┘         └────┬────┘   agent       └────┬────┘
-                                               │                        │
-                                               ▼                        ▼
-                                         [design.md +              [lint pass?
-                                          tasks.md created]          user confirm?]
-┌─────────┐   lint    ┌─────────┐   delegate   ┌─────────┐   lint    ┌─────────┐
-│ CODER   │ ───────▶ │ CODER_  │ ───────────▶ │REVIEWER │ ───────▶ │ REVIEW_ │
-│(entry)  │  L2.5    │ CHECK   │  reviewer-   │(entry)   │  L3      │ CHECK   │
-│         │          │         │  agent       │          │          │         │
-└────┬────┘          └────┬────┘              └────┬────┘          └────┬────┘
-     │                    │                        │                   │
-     │ delegate           │ tasks all done?        │ review passed?    │
-     │ coder-agent        │ NO: continue           │ NO: back to coder │
-     │ (per task)         │ YES: proceed           │ YES: proceed      │
-     ▼                    ▼                        ▼                   ▼
-[commits]           [task reports]          [review-report.md]   [conclusion]
-
-┌─────────┐   lint    ┌─────────┐   delegate   ┌─────────┐   user    ┌─────────┐
-│   QA    │ ───────▶ │  QA_    │ ───────────▶ │  USER   │ ───────▶ │ARCHIVE_ │
-│(entry)  │  pass   │ CHECK   │   qa-agent   │ACCEPT   │ confirm   │ENTRY    │
-└────┬────┘         └────┬────┘              └────┬────┘           └────┬────┘
-     │                   │                        │                    │
-     │                   │ qa passed?             │                    │ R10 + L3
-     │                   │ NO: back to coder      │                    │
-     │                   │ YES: proceed           │                    ▼
-     ▼                   ▼                        ▼               [archive done]
-[tests run]        [qa-report.md]         [user says "归档"]
+```mermaid
+flowchart TD
+    IDLE["IDLE (start)"] -->|"/sdd start"| PO_ENTRY
+    IDLE -->|"/explore"| EXPLORE["EXPLORE (自由对话)"]
+    EXPLORE -->|"放弃"| IDLE
+    EXPLORE -->|"/sdd start"| PO_ENTRY
+    
+    PO_ENTRY["PO (entry)"] -->|delegate po-agent| PO_DONE_dot["PO_DONE\n等待用户确认"]
+    PO_DONE_dot -->|"继续"| BA_ENTRY["BA (entry)"]
 ```
 
 ### 状态定义摘要
@@ -256,6 +214,54 @@ def phase_gate_transition(current_state, next_state):
 
 > **详细门禁检查规范**见 [phase-gates.md](./references/phase-gates.md)
 
+### Telemetry 记录（可选）
+
+每个阶段转换时检查 telemetry 是否启用并记录事件：
+
+```python
+def record_telemetry_if_enabled(change_id, command, phase_from, phase_to, duration_ms=None, result=None):
+    \"\"\"记录 telemetry 事件（如果启用）\"\"\"
+    
+    # 环境变量强制关闭
+    if os.environ.get("DO_NOT_TRACK") or os.environ.get("HERMES_TELEMETRY_DISABLE"):
+        return
+    
+    # 检查 AGENTS.md 配置
+    config = load_agents_config()
+    telemetry_enabled = config.get("telemetry", {}).get("enabled", False)
+    if not telemetry_enabled:
+        return
+    
+    # 写入 NDJSON
+    import json
+    event = {
+        "timestamp": now_iso(),
+        "command": command,
+        "phase_from": phase_from,
+        "phase_to": phase_to,
+    }
+    if duration_ms is not None:
+        event["duration_ms"] = duration_ms
+    if result is not None:
+        event["result"] = result
+    
+    telemetry_dir = os.path.expanduser(f"~/.hermes/telemetry/{change_id}")
+    os.makedirs(telemetry_dir, exist_ok=True)
+    
+    with open(os.path.join(telemetry_dir, "events.ndjson"), "a") as f:
+        f.write(json.dumps(event, ensure_ascii=False) + "\\n")
+```
+
+**调用时机**：
+| 事件类型 | command | 调用位置 |
+|---------|---------|---------|
+| 状态转换 | `transition` | `phase_gate_transition()` 成功后 |
+| Agent 委托 | `delegate` | `delegate_agent()` 前后 |
+| 用户确认 | `user_confirm` | 用户确认等待完成后 |
+| Lint 检查 | `lint_check` | lint 执行后，含 result |
+
+> **详细 telemetry 配置**见 [telemetry.md](./references/telemetry.md)
+
 ---
 
 ## 使用方式
@@ -288,6 +294,80 @@ def phase_gate_transition(current_state, next_state):
 | `USER_ACCEPT` | "归档" | → `ARCHIVE_ENTRY` |
 | 任意等待状态 | "状态" | 输出当前状态和产物 |
 | 任意状态 | "中断" | 保存状态，可恢复 |
+
+### ARCHIVE_ENTRY — 归档流程（6 步）
+
+当用户确认归档（`USER_ACCEPT` → `ARCHIVE_ENTRY`），执行以下 6 步：
+
+#### Step 1: 读取状态，记录时间戳
+
+```python
+state = load_state_json(change_id)
+state["archived_at"] = now()
+```
+
+#### Step 2: Spec Sync
+
+遍历 `changes/{id}/specs/<capability>/`，按 `##` 操作头合并到 `docs/specs/<capability>/spec.md`：
+
+| 操作头 | 合并行为 |
+|--------|---------|
+| `## ADDED Requirements` | 将完整 content 追加到基线 |
+| `## MODIFIED Requirements` | 覆盖基线中同名 requirement |
+| `## REMOVED Requirements` | 删除基线中对应 requirement |
+| `## RENAMED Requirements` | 重命名基线 requirement |
+
+生成 sync 报告（含变更的 capability/行数/操作数）。
+
+#### Step 3: Design 基线合并
+
+读取 `changes/{id}/design.md`，提取关键决策和架构变更，追加到 `docs/current/design.md`（每次归档新增 `##` 章节）。
+
+参考 [design-baseline.md](./references/design-baseline.md)。
+
+#### Step 4: 生成 manifest.json
+
+```json
+{
+  "change_id": "{id}",
+  "archived_at": "{ISO timestamp}",
+  "phases": ["phase_1", "phase_2", ...],
+  "sync_summary": {
+    "specs_synced": true/false,
+    "capabilities": ["cap1", "cap2"],
+    "design_appended": true/false
+  },
+  "artifacts": ["prd.md", "spec.md", "design.md", "tasks.md", "review-report.md", "qa-report.md"]
+}
+```
+
+删除 `.sdd-state.json`。
+
+#### Step 5: 整体迁移
+
+```bash
+# 整个 changes/{id} 移入 archive/{id}/
+# 保持目录结构和引用完整性
+mv docs/changes/{change_id} docs/archive/{change_id}/
+```
+
+#### Step 6: R10 门禁检查
+
+```bash
+# 6.1 检查 PR 已合并
+git log --oneline -1 --merges | grep -q "{change_id}" || echo "WARN: 未检测到 PR merge"
+
+# 6.2 Archive 结构完整
+test -d "docs/archive/{change_id}" || echo "MISSING: archive dir"
+
+# 6.3 Current 基线存在
+test -d "docs/specs/" || echo "MISSING: specs baseline"
+
+# 6.4 --bypass-r10 可选标志
+if [[ "$BYPASS" == "true" ]]; then
+    echo "⚠️ R10 已跳过（HOTFIX 模式）"
+fi
+```
 
 ---
 
@@ -415,3 +495,6 @@ def execute_lint(self, level: str, change_id: str):
 - [delegate-protocol.md](./references/delegate-protocol.md) — Agent委托协议（含 skill_view() 要求）
 - [incremental-mode.md](./references/incremental-mode.md) — 增量交付模式
 - [interrupt-recovery.md](./references/interrupt-recovery.md) — 中断恢复机制
+- [delta-spec.md](./references/delta-spec.md) — Delta Spec 操作头定义与合并
+- [design-baseline.md](./references/design-baseline.md) — Design 基线合并指南
+- [telemetry.md](./references/telemetry.md) — Telemetry 匿名统计配置

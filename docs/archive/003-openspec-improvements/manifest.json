@@ -1,0 +1,31 @@
+{
+  "change_id": "003-openspec-improvements",
+  "archived_at": "2026-06-14T13:47:24+08:00",
+  "title": "OpenSpec 启发改进",
+  "description": "4项改进：探索模式、Spec格式统一、Baseline迁移+Delta Spec、Telemetry",
+  "flow_level": "Standard",
+  "phases": ["phase1_explore", "phase2_spec_format", "phase3_baseline_delta", "phase4_telemetry"],
+  "ac_total": 23,
+  "ac_passed": 23,
+  "sync_summary": {
+    "spec_baseline": "docs/specs/sdd-core/spec.md",
+    "design_baseline": "docs/current/design.md",
+    "capabilities": ["sdd-core"]
+  },
+  "artifacts": [
+    "prd.md",
+    "spec.md",
+    "design.md",
+    "tasks.md",
+    "review-report.md",
+    "fix-review-report.md",
+    "qa-report.md",
+    ".sdd-state.json"
+  ],
+  "commits": [
+    "2f5caea feat(phase1): 探索模式 — explore-agent Skill + orchestrator 入口",
+    "90609d0 feat(phase2): Spec 格式统一 — OpenSpec WHEN/THEN + AC 编号格式",
+    "f8977aa feat(phase3+4): Baseline 结构迁移 + Delta Spec + Telemetry",
+    "77129dd fix(review): Review 打回修复 — C1+C2 CRITICAL + M1-M5 + I1"
+  ]
+}
