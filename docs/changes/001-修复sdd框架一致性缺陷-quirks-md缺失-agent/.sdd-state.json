@@ -1,0 +1,100 @@
+{
+  "change_id": "001-修复sdd框架一致性缺陷-quirks-md缺失-agent",
+  "flow_level": "Standard",
+  "incremental_mode": false,
+  "current_state": "CODER_ENTRY",
+  "previous_state": "ARCHITECT_DONE",
+  "state_history": [
+    {
+      "from_state": "IDLE",
+      "to_state": "PO_ENTRY",
+      "at": "2026-06-16T10:08:27.650885Z",
+      "trigger": "sdd_start",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "PO_ENTRY",
+      "to_state": "PO_DONE",
+      "at": "2026-06-16T18:14:00.000000Z",
+      "trigger": "po_agent_complete",
+      "auto": false,
+      "metadata": {
+        "prd_path": "docs/changes/001-修复sdd框架一致性缺陷-quirks-md缺失-agent/prd.md"
+      }
+    },
+    {
+      "from_state": "PO_DONE",
+      "to_state": "BA_ENTRY",
+      "at": "2026-06-16T10:29:46.170731Z",
+      "trigger": "manual",
+      "auto": false,
+      "metadata": {}
+    },
+    {
+      "from_state": "BA_ENTRY",
+      "to_state": "BA_DONE",
+      "at": "2026-06-16T18:30:00.000000Z",
+      "trigger": "ba_agent_complete",
+      "auto": true,
+      "metadata": {
+        "spec_path": "docs/changes/001-修复sdd框架一致性缺陷-quirks-md缺失-agent/spec.md",
+        "ac_count": 22
+      }
+    },
+    {
+      "from_state": "BA_ENTRY",
+      "to_state": "BA_CHECK",
+      "at": "2026-06-16T18:35:00Z",
+      "trigger": "manual",
+      "auto": true
+    },
+    {
+      "from_state": "BA_CHECK",
+      "to_state": "BA_DONE",
+      "at": "2026-06-16T18:35:01Z",
+      "trigger": "manual",
+      "auto": true
+    },
+    {
+      "from_state": "BA_DONE",
+      "to_state": "ARCHITECT_ENTRY",
+      "at": "2026-06-16T18:40:00Z",
+      "trigger": "manual",
+      "auto": false
+    },
+    {
+      "from_state": "ARCHITECT_ENTRY",
+      "to_state": "ARCHITECT_CHECK",
+      "at": "2026-06-16T18:45:00Z",
+      "trigger": "manual",
+      "auto": true
+    },
+    {
+      "from_state": "ARCHITECT_CHECK",
+      "to_state": "ARCHITECT_DONE",
+      "at": "2026-06-16T18:45:01Z",
+      "trigger": "manual",
+      "auto": true
+    },
+    {
+      "from_state": "ARCHITECT_DONE",
+      "to_state": "CODER_ENTRY",
+      "at": "2026-06-16T18:50:00Z",
+      "trigger": "manual",
+      "auto": false
+    }
+  ],
+  "lint_results": {
+    "L1": null,
+    "L2": null,
+    "L2.5": null,
+    "L3": null
+  },
+  "started_at": "2026-06-16T10:08:27.650543Z",
+  "updated_at": "2026-06-16T18:50:00Z",
+  "metadata": {
+    "orchestrator_version": "2.6.0",
+    "description": "修复SDD框架一致性缺陷：QUIRKS.md缺失/AGENTS.md版本与映射不一致/遗留清理/归档补全"
+  }
+}

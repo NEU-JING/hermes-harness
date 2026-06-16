@@ -310,3 +310,47 @@ hermes profile --help
 # 检查 Kanban 支持
 hermes kanban --help
 ```
+
+---
+
+## SDD Profile 架构概述（由 AGENTS.md 迁移至此）
+
+Hermes SDD 框架采用 **Profile + Soul 双层差异化架构**，实现真正的角色分离：
+
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                        Profile 层（配置层）                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │
+│  │ 模型配置     │  │ Provider配置  │  │ 工具集权限   │            │
+│  └──────────────┘  └──────────────┘  └──────────────┘            │
+└─────────────────────────────────────────────────────────────────┘
+                              │
+                              ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                          Soul 层（思维层）                       │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐            │
+│  │ 角色定义     │  │ 思维模式     │  │ 输出风格     │            │
+│  └──────────────┘  └──────────────┘  └──────────────┘            │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+**核心原理**: Kanban 调度器使用 `hermes -p <profile>` 启动 Worker，每个 Profile 独立加载自己的 `config.yaml`（模型/Provider）和 `SOUL.md`（思维特质），实现零侵入的角色差异化。
+
+### Profile 能力矩阵
+
+| 角色 | Profile 名称 | 推荐模型 | Provider | Soul 核心特质 | 对应 Skill |
+|------|-------------|---------|----------|--------------|-----------|
+| **PO** | sdd-po | deepseek-v4-flash | DeepSeek | 用户思维、场景化、价值导向 | po-agent |
+| **BA** | sdd-ba | deepseek-v4-flash | DeepSeek | MECE、边界清晰、可测性优先 | ba-agent |
+| **Architect** | sdd-architect | deepseek-v4-flash | DeepSeek | 权衡分析、分层设计、演进式思维 | architect-agent |
+| **Coder** | sdd-coder | deepseek-v4-flash | DeepSeek | TDD、防御式编程、可读性优先 | coder-agent |
+| **Reviewer** | sdd-reviewer | deepseek-v4-pro | DeepSeek | 批判性、三阶段评审、异质视角 | reviewer-agent |
+| **QA** | sdd-qa | deepseek-v4-flash | DeepSeek | 破坏式、组合覆盖、回归意识 | qa-agent |
+
+### Soul 模式配置
+
+Soul 模式是每个 Profile 的 `SOUL.md` 文件，定义该角色的**思维特质、决策倾向、输出风格**。详见 `docs/PROFILES-GUIDE.md`。
+
+### Workspace 配置
+
+SDD 流程使用 `dir:<绝对路径>` 类型的 workspace，确保产物跨会话持久化。由 orchestrator.py 从项目根目录推导。

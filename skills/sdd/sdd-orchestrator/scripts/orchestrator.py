@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-SDD Orchestrator v2.1 - 严格状态机编排器
+SDD Orchestrator v2.6.0 — 严格状态机编排器
 
 职责：
 1. 状态管理：维护 .sdd-state.json，驱动状态机推进
@@ -152,9 +152,9 @@ class SDDState:
     model_audit: List[Dict] = field(default_factory=list)  # C3: 模型使用审计
 
 class SDDOrchestrator:
-    """SDD编排器核心类 v2.1.0"""
+    """SDD编排器核心类 v2.6.0"""
     
-    VERSION = "2.1.0"
+    VERSION = "2.6.0"
     
     def __init__(self, project_root: str = None):
         if project_root is None:
@@ -509,8 +509,15 @@ class SDDOrchestrator:
         state = self.load_state(change_id)
         return state.current_state if state else "UNKNOWN"
 
-    def transition(self, change_id: str, target_state: str, trigger: str = "manual") -> bool:
-        """执行状态转换"""
+    def transition(self, change_id: str, target_state: str, trigger: str = "manual", skip_delegate: bool = False) -> bool:
+        """执行状态转换
+
+        Args:
+            change_id: 变更ID
+            target_state: 目标状态
+            trigger: 触发类型
+            skip_delegate: 是否跳过Agent委托（存量任务/手动归档场景）
+        """
         state = self.load_state(change_id)
         if not state:
             print(f"❌ 变更不存在: {change_id}")
@@ -555,9 +562,12 @@ class SDDOrchestrator:
 
         print(f"✅ 转换成功: {target.state_name}")
 
-        # 如果是执行状态，自动委托Agent
+        # 如果是执行状态，自动委托Agent（除非skip_delegate）
         if target.state_type == StateType.EXECUTING and target in STATE_AGENT_MAP:
-            self.delegate_agent(change_id, target)
+            if skip_delegate:
+                print(f"  ⏭️ 跳过Agent委托（--skip-delegate）")
+            else:
+                self.delegate_agent(change_id, target)
 
         # 如果是等待状态，提示用户
         if target.state_type == StateType.WAITING:
@@ -581,6 +591,56 @@ class SDDOrchestrator:
                     return "blocked"
             time.sleep(poll_interval)
         return "timeout"
+
+    def _build_context_for_stage(self, change_id: str, state: State) -> dict:
+        """D9: 构建跨阶段上下文摘要，注入 Kanban task body
+
+        Args:
+            change_id: 当前变更 ID
+            state: 当前目标状态（BA/ARCHITECT/CODER/REVIEWER/QA）
+
+        Returns:
+            dict: 包含前置摘要和约束条件的上下文
+        """
+        import re
+        change_dir = self.changes_dir / change_id
+        context = {}
+
+        if state == State.BA_ENTRY:
+            prd_path = change_dir / "prd.md"
+            if prd_path.exists():
+                text = prd_path.read_text()
+                # 提取 PRD 摘要（前 200 字的核心背景）
+                summary = text[:500].replace('\n', ' ').strip()
+                context["前置摘要"] = f"PRD 摘要（前 500 字符）: {summary}"
+        elif state == State.ARCHITECT_ENTRY:
+            spec_path = change_dir / "spec.md"
+            if spec_path.exists():
+                text = spec_path.read_text()
+                acs = re.findall(r'#### Scenario AC\d+:', text)
+                context["前置摘要"] = f"Spec 包含 {len(acs)} 条 AC: {', '.join(acs)}"
+        elif state == State.CODER_ENTRY:
+            design_path = change_dir / "design.md"
+            if design_path.exists():
+                text = design_path.read_text()
+                match = re.search(r'\*\*最终选择\*\*：(.+)', text)
+                if match:
+                    context["前置摘要"] = f"Design 方案选择: {match.group(1).strip()}"
+                else:
+                    context["前置摘要"] = "Design 已产出（见 design.md）"
+        elif state == State.REVIEWER_ENTRY:
+            spec_path = change_dir / "spec.md"
+            tasks_path = change_dir / "tasks.md"
+            if spec_path.exists():
+                context["前置摘要"] = f"Spec 可用（{spec_path.stat().st_size} bytes）"
+        elif state == State.QA_ENTRY:
+            spec_path = change_dir / "spec.md"
+            review_path = change_dir / "review-report.md"
+            if review_path.exists():
+                context["前置摘要"] = f"Review 已完成（{review_path.stat().st_size} bytes）"
+
+        context["约束条件"] = "SDD 框架一致性修复，所有修改不破坏现有功能"
+        return context
 
     def delegate_agent(self, change_id: str, state: State):
         """委托Agent执行任务（v2.1.0 真正的 Kanban Profile 调度）
@@ -631,6 +691,10 @@ class SDDOrchestrator:
             context["spec_path"] = str(change_dir / "spec.md")
             context["review_path"] = str(change_dir / "review-report.md")
         
+        # D9: 跨阶段上下文摘要
+        context_extra = self._build_context_for_stage(change_id, state)
+        context.update(context_extra)
+
         # 构建 task body
         body_lines = [f"# {change_id}: {state_name} 阶段", ""]
         body_lines.append("## 任务目标")
@@ -639,6 +703,12 @@ class SDDOrchestrator:
         body_lines.append("## 上下文")
         for k, v in context.items():
             body_lines.append(f"- {k}: {v}")
+        body_lines.append("")
+        body_lines.append("## 前置上下文（来自前一阶段）")
+        if context.get("前置摘要"):
+            body_lines.append(context["前置摘要"])
+        else:
+            body_lines.append("（无前置摘要 — 首个阶段或前置产物不存在）")
         body_lines.append("")
         body_lines.append("## 完成标准")
         body_lines.append("- 按要求产出所有产物文件")
@@ -920,6 +990,8 @@ def main():
     trans_parser = subparsers.add_parser("transition", help="手动状态转换")
     trans_parser.add_argument("change_id", help="变更ID")
     trans_parser.add_argument("target_state", help="目标状态")
+    trans_parser.add_argument("--skip-delegate", action="store_true",
+                            help="跳过Agent委托和轮询（用于存量任务/手动归档场景）")
 
     # audit 命令（C3）
     audit_parser = subparsers.add_parser("audit", help="模型使用审计")
@@ -945,7 +1017,8 @@ def main():
         orchestrator.status(args.change_id)
 
     elif args.command == "transition":
-        success = orchestrator.transition(args.change_id, args.target_state, trigger="manual")
+        skip_delegate = getattr(args, 'skip_delegate', False)
+        success = orchestrator.transition(args.change_id, args.target_state, trigger="manual", skip_delegate=skip_delegate)
         if success:
             print(f"\n✅ 转换完成")
         else:

@@ -1,3 +1,5 @@
+<!-- ⚠️ 已迁移：原 kanban create 协议已被 Kanban+Profile 替代。详细委托方式见 kanban-profile-integration.md -->
+
 # Agent Delegation Protocol
 
 > **版本**: 2.1.0  
@@ -13,7 +15,7 @@
 
 ## 协议概述
 
-编排器通过 `delegate_task` 调用各角色Agent。**编排器本身不直接执行任务，只负责调度和状态管理**。
+编排器通过 `kanban create` 调用各角色Agent。**编排器本身不直接执行任务，只负责调度和状态管理**。
 
 ---
 
@@ -22,7 +24,7 @@
 ### 基础委托格式
 
 ```yaml
-delegate_task:
+kanban create:
   goal: "[明确的目标描述]"
   
   context: |
@@ -99,7 +101,7 @@ def delegate_to_agent(agent_type: str, change_id: str, context: dict):
     os.makedirs(output_dir, exist_ok=True)
     
     # 3. 执行委托（不预加载 skill，让 agent 自己处理）
-    result = delegate_task(
+    result = kanban create(
         goal=context['goal'],
         context=context,
         toolsets=["file", "terminal", "skills"]
@@ -190,7 +192,7 @@ def handle_agent_failure(result: AgentResult, current_state: str):
 ### PO阶段委托
 
 ```yaml
-delegate_task:
+kanban create:
   goal: "产出PRD文档：定义变更的背景、目标、功能范围、非目标、成功指标、用户场景"
   
   context: |
@@ -230,7 +232,7 @@ delegate_task:
 ### BA阶段委托
 
 ```yaml
-delegate_task:
+kanban create:
   goal: "根据PRD产出Spec文档：细化需求清单，编写AC（Given-When-Then格式）"
   
   context: |
@@ -278,7 +280,7 @@ delegate_task:
 ### Architect阶段委托
 
 ```yaml
-delegate_task:
+kanban create:
   goal: "根据Spec产出Design文档和Tasks拆分"
   
   context: |
@@ -330,7 +332,7 @@ delegate_task:
 
 ```yaml
 # 为每个Task调用一次
-delegate_task:
+kanban create:
   goal: "实现Task {task_id}: {task_name} — 遵循TDD（RED-GREEN-REFACTOR）"
   
   context: |
@@ -386,7 +388,7 @@ delegate_task:
 
 for task in tasks:
     # 委托单个Task
-    result = delegate_task(
+    result = kanban create(
         goal=f"实现Task {task.id}",
         context={...task context...}
     )
@@ -404,7 +406,7 @@ for task in tasks:
 ### Reviewer阶段委托
 
 ```yaml
-delegate_task:
+kanban create:
   goal: "三阶段评审：Spec合规检查、代码质量检查、架构一致性检查"
   model: "deepseek-v4-pro"  # 方案 A: Reviewer 固定使用 pro 模型，确保评审质量
 
@@ -475,7 +477,7 @@ delegate_task:
 ### QA阶段委托
 
 ```yaml
-delegate_task:
+kanban create:
   goal: "执行测试验证：AC覆盖检查、测试执行、环境差异检查"
   
   context: |

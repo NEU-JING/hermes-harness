@@ -29,7 +29,7 @@ CODER_CHECK ──▶ REVIEWER_ENTRY ──▶ REVIEWER_CHECK
 ## Reviewer阶段委托
 
 ```yaml
-delegate_task:
+kanban create:
   goal: "三阶段代码评审：Spec合规、代码质量、架构一致性"
   
   context: |

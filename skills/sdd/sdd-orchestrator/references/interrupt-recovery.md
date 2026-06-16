@@ -333,7 +333,7 @@ def recover_abnormal(state):
 ━━━━━━━━━━━━━━━━━━━━
 
 [自动执行]
-→ delegate_task: po-agent
+→ kanban create: po-agent
 → 产出 prd.md
 → 状态: PO_ENTRY → PO_CHECK → PO_DONE
 → 等待用户确认...
@@ -382,7 +382,7 @@ def recover_abnormal(state):
 ━━━━━━━━━━━━━━━━━━━━
 
 [自动执行]
-→ delegate_task: coder-agent (resume=T3)
+→ kanban create: coder-agent (resume=T3)
 → 继续完成 T3
 ```
 
