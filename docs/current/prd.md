@@ -216,3 +216,4 @@ P1 — v2.0.2 优化
 | v2.0 | 2026-05-30 | 严格状态机（18 状态）、5 级门禁（L0-L3+R10）、Agent 委托协议 | 006-orchestrator-v2 |
 | v2.0.1 | 2026-05-30 | Skill 精简（≤150 行）+ references/ 分离 | 007-orchestrator-refine |
 | v2.0.2 | 2026-05-30 | Agent 自主加载模式（orchestrator 只调度不预加载） | 007-orchestrator-refine |
+| v3.0 | 2026-06-16 | Profile+Soul 架构落地：6 个 Profile 配置、三层一致性保障、orchestrator 增强 | 001-profile-soul-架构落地与机制验证 |

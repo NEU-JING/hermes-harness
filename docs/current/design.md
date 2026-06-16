@@ -41,3 +41,61 @@
 | skills/sdd/sdd-orchestrator/references/delta-spec.md | 新增 |
 | skills/sdd/sdd-orchestrator/references/design-baseline.md | 新增 |
 | skills/sdd/sdd-orchestrator/references/telemetry.md | 新增 |
+
+---
+
+## Delta: 001-profile-soul-架构落地与机制验证
+
+> 变更日期: 2026-06-16 | 类型: Profile+Soul 架构 | 状态: 已归档
+> 归档来源: docs/archive/001-profile-soul-架构落地与机制验证/design.md
+
+### 核心设计原则
+
+| 原则 | 说明 |
+|------|------|
+| **零侵入** | 不修改 Hermes Agent 核心代码，所有能力通过 Profile 配置和脚本实现 |
+| **完全隔离** | 每个 Profile 独立配置、独立模型、独立 Skill，互不干扰 |
+| **声明式驱动** | 所有配置集中在 AGENTS.md，脚本从配置自动生成，不硬编码 |
+| **可审计** | 全流程模型使用可追溯、可验证、可复盘 |
+
+### 架构总览
+
+```
+AGENTS.md (配置源) → init-profiles.sh (模板化生成) → ~/.hermes/profiles/ (6个Profile)
+                                                              │
+                                                              ▼
+                                              orchestrator.py (状态机调度器)
+                                              ├── Kanban 轮询/重试
+                                              ├── 内容门禁检查
+                                              └── 模型使用审计
+```
+
+### Profile 配置
+
+| Profile | 推荐模型 | Provider | Skill |
+|---------|---------|----------|-------|
+| sdd-po | deepseek-v4-flash | DeepSeek | po-agent + sdd-orchestrator |
+| sdd-ba | deepseek-v4-flash | DeepSeek | ba-agent + sdd-orchestrator |
+| sdd-architect | deepseek-v4-flash | DeepSeek | architect-agent + sdd-orchestrator |
+| sdd-coder | deepseek-v4-flash | DeepSeek | coder-agent + sdd-orchestrator |
+| sdd-reviewer | deepseek-v4-pro | DeepSeek | reviewer-agent + sdd-orchestrator |
+| sdd-qa | deepseek-v4-flash | DeepSeek | qa-agent + sdd-orchestrator |
+
+### 三层一致性保障
+
+| 层级 | 机制 | 说明 |
+|------|------|------|
+| L1 | 文档地图 + 递归分块 | 提前生成全局结构/术语/引用；最大 3 级递归拆分 |
+| L2 | 上下文锚定 | 每个分块携带完整文档地图 + 相邻上下文 |
+| L3 | 一致性审计 | 术语/引用/编号/格式全量检查 |
+
+### 交付物
+
+| 文件 | 说明 |
+|------|------|
+| `scripts/init-profiles.sh` | 多技能、零硬编码路径的 Profile 初始化脚本 |
+| `scripts/validate-*.sh` | 4 个验证脚本 |
+| `scripts/templates/profile/` | Profile 配置模板 |
+| `scripts/setup-sdd-profiles.sh.deprecated` | 废弃的旧版脚本 |
+| `docs/PROFILES-GUIDE.md` | Profile 操作指南 |
+| `skills/.../orchestrator.py` | 增强版编排器（轮询 + 内容门禁 + 审计） |

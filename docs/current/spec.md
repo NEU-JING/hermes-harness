@@ -355,3 +355,53 @@ SKILL.md 精简为摘要，详细内容移至 references/。
 > - v2.0 (2026-05-30): 严格状态机、5 级门禁、delegate 协议（006-orchestrator-v2）
 > - v2.0.1 (2026-05-30): Skill 精简、references 分离（007-orchestrator-refine）
 > - v2.0.2 (2026-05-30): Agent 自主加载模式（007-orchestrator-refine 快速修复）
+> - v3.0 (2026-06-16): **Profile+Soul 架构落地** — 6 Profile 配置、三层一致性保障、orchestrator 增强（001-profile-soul）
+
+---
+
+## Delta: 001-profile-soul-架构落地与机制验证
+
+> 变更日期: 2026-06-16 | 类型: Profile+Soul 架构落地 | 状态: 已归档
+
+### 变更概要
+
+本变更完成了 SDD 框架 **Profile + Soul 双层差异化架构** 的完整落地：
+
+1. **6 个 Profile 配置** — sdd-po / sdd-ba / sdd-architect / sdd-coder / sdd-reviewer / sdd-qa，各自独立模型、独立 Soul
+2. **声明式配置** — 所有模型配置集中在 AGENTS.md，用户部署时自定义
+3. **三层一致性保障** — L1 文档地图 + 递归分块 / L2 上下文锚定 / L3 一致性审计
+4. **orchestrator 增强** — Kanban 轮询/重试、内容门禁检查、模型使用审计
+5. **初始化工具集** — `init-profiles.sh`、4 个验证脚本、Profile 模板目录
+
+### 新增/修改的需求
+
+| 编号 | 描述 | 优先级 | 状态 |
+|------|------|--------|------|
+| R1 | 6 个 Profile 完整配置（config.yaml + SOUL.md） | P0 | ✅ |
+| R2 | Profile 初始化脚本（init-profiles.sh） | P0 | ✅ |
+| R3 | 机制验证工具集（4 个验证脚本） | P0 | ✅ |
+| R4 | 文档更新（AGENTS.md、architecture.md、PROFILES-GUIDE.md） | P0 | ✅ |
+| R5 | orchestrator 状态机自动化（Kanban 轮询/重试/阻塞） | P0 | ✅ |
+| R6 | 门禁检查增强（PRD 章节/AC 格式/Design 内容质量检查） | P1 | ✅ |
+| R7 | 模型使用审计（model_audit + audit 命令） | P1 | ✅ |
+| R8 | Profile 标准化初始化脚本（从 AGENTS.md 读取） | P1 | ✅ |
+| R9 | 体验优化（进度条、断点续传、产物哈希校验） | P2 | ✅ |
+| R10 | 三层一致性保障的文档分块生成机制 | P0 | ✅ |
+
+### 三层一致性保障机制
+
+| 层级 | 名称 | 职责 |
+|------|------|------|
+| **L1** | 文档地图 + 递归分块 | 全局结构、术语表、引用注册；最大 3 级递归拆分 |
+| **L2** | 上下文锚定 | 每个分块携带完整文档地图 + 相邻分块上下文 |
+| **L3** | 一致性审计 | 术语一致性 / 引用完整性 / 编号连续性 / 格式一致性 |
+
+### 交付物清单
+
+| 文件 | 说明 |
+|------|------|
+| `~/.hermes/profiles/sdd-*/` | 6 个 Profile 配置（config.yaml + SOUL.md） |
+| `scripts/init-profiles.sh` | 多技能、无硬编码路径的初始化脚本 |
+| `scripts/validate-*.sh` | 4 个验证脚本（隔离/Soul/Workspace/端到端） |
+| `scripts/templates/profile/` | 模板目录（config.yaml.template + SOUL.md.template） |
+| `docs/PROFILES-GUIDE.md` | Profile 操作指南 |
