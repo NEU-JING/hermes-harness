@@ -405,3 +405,20 @@ SKILL.md 精简为摘要，详细内容移至 references/。
 | `scripts/validate-*.sh` | 4 个验证脚本（隔离/Soul/Workspace/端到端） |
 | `scripts/templates/profile/` | 模板目录（config.yaml.template + SOUL.md.template） |
 | `docs/PROFILES-GUIDE.md` | Profile 操作指南 |
+
+### AC 基线映射
+
+本变更新增的 AC 已写入 `docs/specs/sdd-core/spec.md`（baseline），编号 AC24-AC33：
+
+| AC | 对应 Requirement | 说明 |
+|:--:|:----------------|:-----|
+| AC24 | Profile 声明式配置系统 | 角色→Profile 映射表 |
+| AC25 | Profile 声明式配置系统 | Profile 不存在回退 |
+| AC26 | Profile 声明式配置系统 | AGENTS.md 段边界隔离 |
+| AC27 | Profile 声明式配置系统 | 声明式覆盖优先 |
+| AC28 | 4 层一致性保障机制 | L1 文档地图生成 |
+| AC29 | 4 层一致性保障机制 | L2 上下文锚定 |
+| AC30 | 4 层一致性保障机制 | L3 递归分块 |
+| AC31 | 4 层一致性保障机制 | L4 一致性审计 |
+| AC32 | 异构评审模式 | 异构 Provider 隔离 |
+| AC33 | 异构评审模式 | 模型使用审计 |

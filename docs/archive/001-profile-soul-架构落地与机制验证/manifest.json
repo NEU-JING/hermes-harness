@@ -1,0 +1,37 @@
+{
+  "change_id": "001-profile-soul-架构落地与机制验证",
+  "archived_at": "2026-06-16T17:00:10+08:00",
+  "title": "Profile+Soul 架构落地与机制验证",
+  "description": "6角色独立Profile配置、声明式配置、四层一致性保障、orchestrator增强、初始化工具集",
+  "flow_level": "Standard",
+  "ac_total": 33,
+  "ac_added": [
+    "AC24",
+    "AC25",
+    "AC26",
+    "AC27",
+    "AC28",
+    "AC29",
+    "AC30",
+    "AC31",
+    "AC32",
+    "AC33"
+  ],
+  "sync_summary": {
+    "spec_baseline": "docs/specs/sdd-core/spec.md",
+    "capabilities": [
+      "sdd-core"
+    ],
+    "delta_type": "ADDED (3 new requirements)"
+  },
+  "artifacts": [
+    "prd.md",
+    "spec.md",
+    "design.md",
+    "tasks.md",
+    "review-report.md",
+    "qa-report.md",
+    ".sdd-state.json",
+    "specs/sdd-core/spec.md"
+  ]
+}

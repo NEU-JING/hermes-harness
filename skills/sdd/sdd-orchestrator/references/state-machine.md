@@ -55,14 +55,14 @@ entry_conditions:
   - .sdd-state.json 已创建
 
 execution: |
-  delegate_task:
+  kanban create:
     goal: "根据变更描述产出PRD"
     skill: po-agent
     deliverables:
       - prd.md
 
 exit_conditions:
-  - delegate_task 返回成功
+  - kanban create 返回成功
   - prd.md 文件已创建
 
 transitions:
@@ -143,7 +143,7 @@ entry_conditions:
   - prd.md 存在（作为输入）
 
 execution: |
-  delegate_task:
+  kanban create:
     goal: "根据PRD产出Spec"
     skill: ba-agent
     inputs:
@@ -152,7 +152,7 @@ execution: |
       - spec.md
 
 exit_conditions:
-  - delegate_task 返回成功
+  - kanban create 返回成功
   - spec.md 已创建
 
 transitions:
@@ -216,7 +216,7 @@ entry_conditions:
   - spec.md 存在
 
 execution: |
-  delegate_task:
+  kanban create:
     goal: "根据Spec产出Design和Tasks"
     skill: architect-agent
     inputs:
@@ -226,7 +226,7 @@ execution: |
       - tasks.md
 
 exit_conditions:
-  - delegate_task 返回成功
+  - kanban create 返回成功
   - design.md + tasks.md 已创建
 
 transitions:
@@ -296,7 +296,7 @@ entry_conditions:
 execution: |
   # 为每个Task调用coder-agent
   for task in tasks:
-    delegate_task:
+    kanban create:
       goal: f"实现Task: {task.name}"
       skill: coder-agent
       inputs:
@@ -353,7 +353,7 @@ entry_conditions:
   - completion-report.md 存在
 
 execution: |
-  delegate_task:
+  kanban create:
     goal: "评审代码实现"
     skill: reviewer-agent
     inputs:
@@ -365,7 +365,7 @@ execution: |
       - review-report.md
 
 exit_conditions:
-  - delegate_task 返回成功
+  - kanban create 返回成功
   - review-report.md 已创建
 
 transitions:
@@ -419,7 +419,7 @@ entry_conditions:
   - review-report.md（通过）
 
 execution: |
-  delegate_task:
+  kanban create:
     goal: "执行测试验证"
     skill: qa-agent
     inputs:
@@ -429,7 +429,7 @@ execution: |
       - qa-report.md
 
 exit_conditions:
-  - delegate_task 返回成功
+  - kanban create 返回成功
   - qa-report.md 已创建
 
 transitions:

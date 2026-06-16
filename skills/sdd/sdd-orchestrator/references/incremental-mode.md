@@ -151,7 +151,7 @@ CODER_ENTRY(Phase1) → CODER_CHECK(Phase1) → REVIEWER_ENTRY(Phase1) → REVIE
 ### Coder阶段委托（按Phase）
 
 ```yaml
-delegate_task:
+kanban create:
   goal: "实现 Phase {N} 的所有Tasks"
   
   context: |
@@ -181,7 +181,7 @@ delegate_task:
 ### Reviewer阶段委托（按Phase）
 
 ```yaml
-delegate_task:
+kanban create:
   goal: "评审 Phase {N} 的代码实现"
   
   context: |

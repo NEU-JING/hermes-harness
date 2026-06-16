@@ -51,7 +51,7 @@ When content exists in both places:
 Agents might "跑偏" (deviate) by using wrong skills or missing context when delegating tasks.
 
 ### Solution
-**Mandatory `skill_view()` before `delegate_task()`**
+**Mandatory `skill_view()` before `kanban create()`**
 
 ```python
 # 1. Pre-delegation: Load skill explicitly
@@ -68,7 +68,7 @@ def pre_delegation_check(agent_type: str, change_id: str):
     return PreCheckResult(success=True, skill_info=skill_info)
 
 # 2. Execute delegation only after skill loaded
-result = delegate_task(...)
+result = kanban create(...)
 ```
 
 ### Skill Mapping

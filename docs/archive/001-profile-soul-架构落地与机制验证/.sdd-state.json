@@ -2,8 +2,8 @@
   "change_id": "001-profile-soul-架构落地与机制验证",
   "flow_level": "Standard",
   "incremental_mode": false,
-  "current_state": "QA_CHECK",
-  "previous_state": "QA_ENTRY",
+  "current_state": "DONE",
+  "previous_state": "ARCHIVE_ENTRY",
   "state_history": [
     {
       "from_state": "IDLE",
@@ -148,6 +148,27 @@
       "trigger": "manual",
       "auto": true,
       "metadata": {}
+    },
+    {
+      "from_state": "QA_CHECK",
+      "to_state": "USER_ACCEPT",
+      "at": "2026-06-16T17:00:00Z",
+      "trigger": "manual",
+      "auto": false
+    },
+    {
+      "from_state": "USER_ACCEPT",
+      "to_state": "ARCHIVE_ENTRY",
+      "at": "2026-06-16T17:00:05Z",
+      "trigger": "manual",
+      "auto": false
+    },
+    {
+      "from_state": "ARCHIVE_ENTRY",
+      "to_state": "DONE",
+      "at": "2026-06-16T17:00:10Z",
+      "trigger": "archive_complete",
+      "auto": true
     }
   ],
   "lint_results": {
@@ -157,9 +178,11 @@
     "L3": null
   },
   "started_at": "2026-06-16T00:59:26.138343Z",
-  "updated_at": "2026-06-16T08:58:03.711677Z",
+  "updated_at": "2026-06-16T17:00:10Z",
   "metadata": {
     "orchestrator_version": "2.1.0",
-    "description": "Profile Soul 架构落地与机制验证"
+    "description": "Profile Soul 架构落地与机制验证",
+    "archive_fixed": true,
+    "original_end_state": "QA_CHECK"
   }
 }
