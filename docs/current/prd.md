@@ -1,195 +1,218 @@
-# PRD: Profile+Soul 架构落地与机制验证
+# PRD — Hermes Harness（SDD 通用开发机制）
 
-> 变更 ID: 001-profile-soul-架构落地与机制验证
-> 版本: 1.0 | 最后更新: 2026-06-16
-
----
-
-## 背景与目标
-
-**背景**:
-Hermes SDD 框架的核心创新是 **Profile + Soul 双层差异化架构**，通过独立 Profile 配置（模型/Provider/工具集）+ SOUL.md 思维特质（人格/思维模式/输出风格）实现真正的角色分离。目前架构设计已完成（architecture.md、AGENTS.md），但需要实际落地配置并验证各机制是否按预期工作。
-
-**目标**:
-1. 完成 6 个 SDD Profile 的完整配置（config.yaml + SOUL.md）
-2. 验证 Profile 隔离机制、Soul 思维特质注入、Workspace 绑定机制的正确性
-3. 通过端到端流程走通，确认异构评审模式、跨阶段产物传递正常工作
-4. 产出可复用的 Profile 初始化脚本和验证工具
+> **Product Requirements Document**
+> 版本：1.0 | 最后更新：2026-05-25
 
 ---
 
-## 用户场景
+## 1. 背景与目标
 
-### 场景 1：SDD 框架维护者初始化 Profile 环境
+### 1.1 问题陈述
 
-- **角色**: SDD 框架维护者 / 开发者
-- **前置条件**: Hermes Agent v2.1.0+ 已安装，项目代码已克隆
-- **操作流程**:
-  1. 运行 `scripts/init-profiles.sh` 脚本
-  2. 脚本自动创建 6 个 Profile（sdd-po、sdd-ba、sdd-architect、sdd-coder、sdd-reviewer、sdd-qa）
-  3. 每个 Profile 自动配置对应的 config.yaml（模型、Provider、工具集）
-  4. 每个 Profile 自动配置对应的 SOUL.md（角色思维特质）
-- **期望结果**:
-  - 6 个 Profile 全部创建成功
-  - 每个 Profile 的 config.yaml 包含正确的模型和 Provider 配置
-  - 每个 Profile 的 SOUL.md 包含该角色特有的思维模式、工作原则、禁止事项
-  - 运行 `hermes profile list` 能看到所有 6 个 Profile
+AI Agent 编码存在三个系统性缺陷：
 
-### 场景 2：SDD 框架维护者验证 Profile 隔离机制
-
-- **角色**: SDD 框架维护者 / 开发者
-- **前置条件**: 6 个 Profile 已创建完成
-- **操作流程**:
-  1. 使用 `hermes -p sdd-po` 启动 PO Profile
-  2. 验证加载的是 doubao-seed-2.0-pro 模型和火山引擎 Provider
-  3. 验证 PO 的 Soul 思维特质已注入系统提示词
-  4. 使用 `hermes -p sdd-reviewer` 启动 Reviewer Profile
-  5. 验证加载的是 deepseek-v4-pro 模型和 DeepSeek Provider
-  6. 验证 Reviewer 的批判性思维 Soul 已注入
-- **期望结果**:
-  - 不同 Profile 启动时加载各自独立的模型配置
-  - 不同 Profile 启动时加载各自独立的 Provider 配置
-  - SOUL.md 内容正确注入到系统提示词中
-  - Profile 之间完全隔离，互不影响
-
-### 场景 3：SDD 框架维护者验证端到端 SDD 流程
-
-- **角色**: SDD 框架维护者 / 开发者
-- **前置条件**: 6 个 Profile 配置完成且隔离验证通过
-- **操作流程**:
-  1. 使用 orchestrator 发起一个测试变更（如一个简单的 Skill 增强）
-  2. 观察 Kanban 调度器正确分配任务到对应 Profile 的 Worker
-  3. 验证每个阶段的产物（prd.md → spec.md → design.md → 代码 → review-report.md）正确生成
-  4. 验证 Workspace 的 dir 类型绑定正确，产物持久化到项目目录
-- **期望结果**:
-  - Kanban 任务正确分配给对应的 Profile Worker
-  - 每个阶段产物按预期生成，路径正确
-  - 产物持久化在项目的 `docs/changes/` 目录下
-  - 异构评审模式生效（Reviewer 使用不同的模型/Provider）
-
----
-
-## 功能范围
-
-### In Scope（本次包含）
-
-1. **6 个 Profile 的完整配置**
-   - sdd-po: PO 角色配置（doubao-seed-2.0-pro + 火山引擎 + 用户思维 Soul）
-   - sdd-ba: BA 角色配置（doubao-seed-2.0-pro + 火山引擎 + MECE 思维 Soul）
-   - sdd-architect: Architect 角色配置（glm-5.1 + 火山引擎 + 架构思维 Soul）
-   - sdd-coder: Coder 角色配置（doubao-seed-2.0-code + 火山引擎 + TDD 思维 Soul）
-   - sdd-reviewer: Reviewer 角色配置（deepseek-v4-pro + DeepSeek + 批判性思维 Soul）
-   - sdd-qa: QA 角色配置（doubao-seed-2.0-pro + 火山引擎 + 破坏性测试 Soul）
-
-2. **Profile 初始化脚本**
-   - `scripts/init-profiles.sh`: 一键创建所有 Profile 的 Shell 脚本
-   - 支持增量更新（Profile 已存在时跳过或更新）
-
-3. **机制验证工具集**
-   - Profile 隔离检查脚本
-   - Soul 注入验证脚本
-   - Workspace 绑定验证脚本
-   - 端到端流程冒烟测试脚本
-
-4. **文档更新**
-   - AGENTS.md 的 Profile 配置示例完善
-   - architecture.md 的机制说明补充
-   - 新增 PROFILES-GUIDE.md（Profile 使用指南）
-
-5. **【P0】orchestrator 状态机自动化**
-   - 新增 Kanban 任务状态轮询机制（每 10s 检查一次）
-   - 任务完成后自动触发门禁检查（transition）
-   - 任务失败后自动更新 .sdd-state.json 的 blocked_reason 字段
-   - 最多 3 次自动重试机制
-   - 目标：实现真正"无人值守"的全自动流程驱动
-
-6. **【P1】门禁检查增强**
-   - L1 检查：PRD 必须包含（背景/目标/用户场景/功能范围/验收标准）5 大章节
-   - L1+L2 检查：Spec 必须包含 AC 且格式符合 Given-When-Then 规范
-   - L2 检查：Design 必须包含（架构图/接口定义/数据结构/任务拆分）
-   - L2.5 检查：代码必须有对应的测试用例
-   - 目标：门禁不再是"文件存在检查"，而是"内容质量检查"
-
-7. **【P1】模型使用审计**
-   - 每个阶段完成后，在 .sdd-state.json 中记录实际使用的模型、Provider、Kanban 任务ID
-   - 新增 `orchestrator.py audit` 命令输出模型使用审计报告
-   - 目标：事后可审计，确认各阶段确实用了正确的模型
-
-8. **【P1】Profile 标准化初始化脚本**
-   - 从 AGENTS.md 的 role_to_profile 配置自动生成所有 Profile
-   - 自动生成 config.yaml（模型/Provider/API Key）
-   - 自动生成 SOUL.md（从模板库生成各角色思维特质）
-   - 支持增量更新（Profile 已存在时跳过或覆盖）
-   - 目标：一行命令完成 6 个 Profile 的完整初始化
-
-9. **【P2】体验优化**
-   - orchestrator status 增加进度条可视化 `[●●●○○○○○]`
-   - orchestrator status 显示当前 Kanban 任务ID和产物清单
-   - Kanban 任务 body 增加前置产物路径、输出格式要求
-   - 新增中断恢复机制（会话断开后重新连接继续执行）
-   - 新增产物哈希校验（防止手动修改）
-
-### Out of Scope（本次不包含）
-
-1. 不修改 Hermes Agent 核心代码（零侵入原则）
-2. 不新增 SDD 流程阶段（保持现有 6 阶段不变）
-3. 不修改现有 Skill 的核心逻辑（只做配置层面调整）
-4. 不涉及多租户 Profile 隔离
-5. 不涉及 Profile 的动态切换（热重载）
-
----
-
-## 非功能需求（NFR）
-
-| 类别 | 要求 | 指标 |
+| 问题 | 现象 | 根因 |
 |------|------|------|
-| 性能 | Profile 切换快速 | `hermes -p <profile>` 启动时间 < 2 秒 |
-| 安全 | 敏感信息安全 | API Key 等敏感信息只存于各 Profile 的 `config.yaml`，不提交到 Git |
-| 可用性 | 脚本可用性 | 初始化脚本在 Linux/macOS 下均可正常运行 |
-| 可维护性 | 配置一致性 | 所有 Profile 配置遵循统一的目录结构和命名规范 |
-| 可扩展性 | 新增 Profile 便捷 | 新增一个 Profile 的时间 < 10 分钟（基于模板） |
-| 可靠性 | 隔离性保证 | 一个 Profile 的配置变更不影响其他任何 Profile |
+| **流程缺失** | Agent 跳过 Spec、忽略测试、直接 push main | 无结构化流程约束 |
+| **质量不稳** | 写完即忘，同一坑反复踩 | 无跨会话记忆、无强制 Review/QA |
+| **不可追溯** | 需求→代码之间无审计链 | 产物散落、格式不统一 |
+
+这些"捷径"在原型阶段无伤大雅，但在生产级项目中累积为技术债，且**不同项目重复踩同样的坑**。
+
+### 1.2 目标
+
+构建一套**跨项目可复用的 Agentic 开发流程引擎**（Hermes Harness），将软件工程最佳实践编码为 Agent 可执行的 Skill，让 AI Agent 像一支工程团队一样工作。
+
+**三个层次**：
+1. **通用层** — 流程骨架 + 角色 Skill + 共享规范，一次开发多项目复用
+2. **项目层** — 每个项目通过 `AGENTS.md` 声明技术栈、路径、自定义规则
+3. **实例层** — 每次变更的产物（PRD→Spec→Design→Tasks→Review→QA），归档到 `docs/archive/`
+
+### 1.3 核心原则
+
+> **流程通用化、角色 Skill 化、项目配置化**
+
+- SDD 不做 Agent 的替代品——它做 Agent 的**工程规范层**
+- 所有流程描述在 Skills 中，项目配置（AGENTS.md）只声明"我是谁、用哪套流程、有什么约束"
 
 ---
 
-## 验收标准（高层级）
+## 2. 目标用户与场景
 
-1. ✅ **6 个 Profile 创建完成**：`~/.hermes/profiles/` 目录下存在 sdd-po、sdd-ba、sdd-architect、sdd-coder、sdd-reviewer、sdd-qa 共 6 个 Profile 目录
+### 2.1 用户画像
 
-2. ✅ **每个 Profile 配置完整**：每个 Profile 目录下包含：
-   - `config.yaml`：正确的模型、Provider、工具集配置
-   - `SOUL.md`：该角色特有的思维特质定义
+| 角色 | 场景 |
+|------|------|
+| **独立开发者** | 用 AI Agent 开发个人项目，需要流程约束防止偷工减料 |
+| **技术负责人** | 管理 AI Agent 辅助的团队开发，需要统一流程标准和产物格式 |
+| **平台产品负责人** | 在组织内推广 AI Agent 开发模式，需要可复制的流程框架 |
 
-3. ✅ **Profile 隔离验证通过**：
-   - sdd-po 启动时使用 doubao-seed-2.0-pro 模型
-   - sdd-reviewer 启动时使用 deepseek-v4-pro 模型和 DeepSeek Provider
-   - 修改一个 Profile 的配置不影响其他 Profile
+### 2.2 典型工作流
 
-4. ✅ **Soul 注入验证通过**：启动任意 Profile 时，SOUL.md 的内容出现在系统提示词中，影响 Agent 的输出风格
+```
+用户："/sdd start 用户登录功能"
 
-5. ✅ **Workspace 绑定验证通过**：Kanban Worker 启动时正确 cd 到项目目录，产物写入 `docs/changes/{change_id}/`
-
-6. ✅ **端到端流程验证通过**：使用一个测试变更走通 PO → BA → Architect → Coder → Reviewer → QA 全流程，各阶段产物正常生成
-
-7. ✅ **文档完整**：AGENTS.md、architecture.md 已更新，新增 PROFILES-GUIDE.md
+编排器：
+  1. 判定流程级别 → Standard
+  2. PO Agent → 产出 prd.md → 用户确认
+  3. BA Agent → 产出 spec.md（含 AC） → 用户确认
+  4. Architect Agent → Brainstorming ≥2 方案 → design.md + tasks.md → 用户确认
+  5. Coder Agent → TDD 逐 Task 实现 → 代码 + 测试
+  6. Reviewer Agent → 三阶段评审 → review-report.md
+  7. QA Agent → AC 覆盖矩阵 + 测试执行 → qa-report.md
+  8. 用户验收 → 分类打回或确认通过
+  9. 归档 → 基线融合 + 变更移入 archive/
+```
 
 ---
 
-## 风险与假设
+## 3. 功能范围
 
-### 风险
+### 3.1 核心能力
 
-| 风险 | 影响 | 概率 | 缓解措施 |
-|------|------|:---:|------|
-| Hermes 版本不兼容，Profile 功能异常 | 高（流程阻塞） | 中 | 在初始化脚本中加入版本检测，提前报错并给出降级方案 |
-| SOUL.md 内容未正确注入系统提示词 | 中（角色差异化失效） | 低 | 编写专门的验证脚本，检查系统提示词是否包含 Soul 内容 |
-| API Key 配置错误导致模型调用失败 | 中（无法验证） | 中 | 在验证脚本中加入模型连通性检查，提前发现配置问题 |
-| Workspace 路径计算错误，产物写入位置不对 | 高（跨阶段共享失效） | 中 | 使用绝对路径推导，加入路径存在性检查和写入权限验证 |
+| 模块 | 功能 | 优先级 |
+|------|------|:--:|
+| **流程编排** | 判定流程级别（Quick/Standard/Enhanced）、调度角色、门禁检查 | P0 |
+| **角色系统** | 8 个角色 Skill（PO/BA/Architect/Coder/Reviewer/QA/Init/Lint） | P0 |
+| **项目初始化** | `sdd-init`：新项目交互式搭建 + 存量项目无痛升级 | P0 |
+| **结构验证** | `sdd-structure-lint`：三级验证（文件/产物/内容）| P0 |
+| **用户门禁** | PO/BA/Architect 后用户确认、验收通过后归档 | P0 |
+| **闭环回退** | Reviewer↔Coder（2 轮）、QA↔Coder（4 轮）→ 熔断 | P0 |
+| **基线维护** | `docs/current/` 作为融合后的生产全貌，非变更日志堆砌 | P1 |
+| **Git 工作流** | Feature 分支 + PR（merge 在验收后）+ R10 合规检查 | P1 |
+| **中断恢复** | `.sdd-state.json` 状态持久化，重启后从断点继续 | P1 |
+| **增量交付** | Phase 级独立交付，支持分 Phase 验收和上线 | P1 |
+| **Phase 状态追踪** | `.sdd-state.json` 支持 `phase_status` 记录各 Phase 完成状态 | P2 |
+| **Phase 门禁** | Phase 完成后自动触发 Mini Review/QA | P2 |
 
-### 假设
+### 3.2 流程级别
 
-- Hermes Agent 版本 ≥ v2.1.0，支持 Profile 功能和 Kanban `--assignee` 参数
-- 用户已配置好各 Provider 的 API Key（火山引擎、DeepSeek）
-- 执行初始化脚本的用户对 `~/.hermes/profiles/` 目录有读写权限
-- 项目代码位于 `hermes-harness` 目录，脚本可以正确推导绝对路径
-- Kanban gateway 已配置好，支持跨 Profile 任务通知
+| 级别 | 适用场景 | 阶段 |
+|------|---------|------|
+| **Quick** | Bug 修复、配置变更 | Architect 轻量 → Coder → QA 轻量 |
+| **Standard** | 常规功能开发（默认） | PO→BA→Architect→Coder→Reviewer→QA→验收→归档 |
+| **Enhanced** | 安全/性能关键 | Standard + 安全审查 + 性能测试 + 灰度验证 |
+| **Incremental** | 大型重构/多 Phase 交付 | Standard + Phase 级 Review/QA + 分阶段验收 |
+
+### 3.3 不在范围内
+
+- 代码质量工具本身（black/isort/ruff 属于项目配置，非 SDD 框架）
+- CI/CD 流水线实现（SDD 只定义 CI-only marker 规范，不实现具体 CI 配置）
+- 项目管理（Issue 跟踪、Sprint 规划等）
+
+---
+
+## 4. 非功能需求
+
+| 需求 | 说明 |
+|------|------|
+| **通用性** | Skills 不依赖特定项目路径、技术栈、数据库 |
+| **可安装性** | 一键安装（`./install.sh`），支持 `--force` 覆盖更新 |
+| **Token 效率** | 角色 SKILL.md ~70 行，references 按需加载 |
+| **可扩展性** | 项目可通过 AGENTS.md `convention_overrides` 添加/禁用规则 |
+
+---
+
+## 5. 风险与假设
+
+| 风险 | 缓解措施 |
+|------|---------|
+| Skills 内容密度过高导致 Agent 遵循度下降 | 角色 SKILL.md 控制在 ~70 行，复杂逻辑拆到 references |
+| 不同 Agent 平台对 Skill 格式兼容性差异 | 纯 Markdown 格式，YAML frontmatter，零平台锁定 |
+| 存量项目升级时丢失自定义配置 | `sdd-upgrade` 先分析后计划，用户确认前不执行任何写操作 |
+| git-workflow 规范本身成为违反对象 | 通过 R10 在归档前强制检查，SDD 项目自身也遵守 |
+| Phase 间耦合比预期高 | Design 阶段强制要求松耦合设计，明确依赖声明 |
+
+### 5.1 假设
+
+- 目标项目使用 Git 版本控制
+- 用户愿意在每个阶段确认门禁（PO/BA/Architect 后各一次）
+- Agent 运行环境支持 skill_view 文档地图机制（Hermes Agent v2.0+）
+
+---
+
+## 6. 成功指标
+
+- 一个全新项目通过 `sdd-init` 在 2 分钟内完成骨架搭建
+- 一个存量项目（如 AILP）通过 `sdd-upgrade` 无丢失接入 SDD
+- 3 个不同技术栈的项目（Python/Go/JS）用同一套 Skills 走通完整 SDD 流程
+- README.md 的流程图 + 门禁表能让人 1 分钟理解 SDD 流程
+- 100% 代码变更通过 feature 分支 + PR 流程（R10 合规）
+- Phase 1 独立交付率达到 100%（增量模式）
+
+---
+
+## 功能 5：严格状态机
+
+### 用户价值
+让编排器具备确定性的状态管理能力，消除流程模糊性，支持中断恢复。
+
+### 验收标准
+- [ ] 定义 18 状态状态机（IDLE → PO_ENTRY → ... → DONE）
+- [ ] 每个状态有明确的 Entry 条件、Execution、Exit 条件、Transitions
+- [ ] 状态自动推进，门禁检查通过才转换
+- [ ] 支持 `.sdd-state.json` 中断恢复
+
+### 优先级
+P0 — v2.0 核心功能
+
+---
+
+## 功能 6：5 级门禁检查
+
+### 用户价值
+在每个阶段转换时自动执行质量检查，早期发现问题，避免问题累积。
+
+### 验收标准
+- [ ] L0：初始化检查（目录结构创建）
+- [ ] L1：基础检查（文件存在、格式正确）
+- [ ] L2：设计检查（Design/Tasks 完整）
+- [ ] L2.5：代码检查（Task 完成、commits 存在）
+- [ ] L3：质量检查（报告质量、AC 覆盖）
+- [ ] R10：归档检查（PR 合规、current/ 更新）
+
+### 优先级
+P0 — v2.0 核心功能
+
+---
+
+## 功能 7：Agent 委托协议
+
+### 用户价值
+标准化的 Agent 调用机制，支持编排器统一调度各角色 Agent。
+
+### 验收标准
+- [ ] 定义 delegate_task 格式（goal + context + toolsets）
+- [ ] 编排器执行前置检查（产物存在、目录创建）
+- [ ] Agent 内部自主加载自己的 skill
+- [ ] 支持 6 个角色的委托调用（PO/BA/Architect/Coder/Reviewer/QA）
+
+### 优先级
+P0 — v2.0 核心功能
+
+---
+
+## 功能 8：Skill 精简与 Agent 自主加载
+
+### 用户价值
+减少 token 消耗，提高性能；让 Agent 自包含，提高复用性。
+
+### 验收标准
+- [ ] SKILL.md 精简至 ≤150 行
+- [ ] 详细内容移至 references/
+- [ ] Agent 内部调用 `skill_view` 自主加载自己的 skill
+- [ ] orchestrator 不再预加载 skill，只负责调度
+
+### 优先级
+P1 — v2.0.2 优化
+
+---
+
+## 版本更新记录
+
+| 版本 | 日期 | 变更内容 | 变更来源 |
+|------|------|---------|---------|
+| v1.0 | 2026-05-25 | 初始版本：8 角色 SDD 流程、Quick/Standard/Enhanced 流程级别、中断恢复 | 001-sdd-init |
+| v2.0 | 2026-05-30 | 严格状态机（18 状态）、5 级门禁（L0-L3+R10）、Agent 委托协议 | 006-orchestrator-v2 |
+| v2.0.1 | 2026-05-30 | Skill 精简（≤150 行）+ references/ 分离 | 007-orchestrator-refine |
+| v2.0.2 | 2026-05-30 | Agent 自主加载模式（orchestrator 只调度不预加载） | 007-orchestrator-refine |
