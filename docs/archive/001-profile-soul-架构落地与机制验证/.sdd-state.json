@@ -1,0 +1,165 @@
+{
+  "change_id": "001-profile-soul-架构落地与机制验证",
+  "flow_level": "Standard",
+  "incremental_mode": false,
+  "current_state": "QA_CHECK",
+  "previous_state": "QA_ENTRY",
+  "state_history": [
+    {
+      "from_state": "IDLE",
+      "to_state": "PO_ENTRY",
+      "at": "2026-06-16T00:59:26.138655Z",
+      "trigger": "sdd_start",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "PO_ENTRY",
+      "to_state": "PO_CHECK",
+      "at": "2026-06-16T01:03:28.197605Z",
+      "trigger": "manual",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "PO_CHECK",
+      "to_state": "PO_DONE",
+      "at": "2026-06-16T01:55:34.454810Z",
+      "trigger": "manual",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "PO_DONE",
+      "to_state": "BA_ENTRY",
+      "at": "2026-06-16T01:56:07.084061Z",
+      "trigger": "manual",
+      "auto": false,
+      "metadata": {}
+    },
+    {
+      "from_state": "BA_ENTRY",
+      "to_state": "BA_CHECK",
+      "at": "2026-06-16T02:51:51.883334Z",
+      "trigger": "manual",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "BA_CHECK",
+      "to_state": "BA_DONE",
+      "at": "2026-06-16T02:51:51.950666Z",
+      "trigger": "manual",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "BA_DONE",
+      "to_state": "ARCHITECT_ENTRY",
+      "at": "2026-06-16T06:53:23.531872Z",
+      "trigger": "manual",
+      "auto": false,
+      "metadata": {}
+    },
+    {
+      "from_state": "BA_DONE",
+      "to_state": "ARCHITECT_ENTRY",
+      "at": "2026-06-16T07:00:38.647733Z",
+      "trigger": "manual",
+      "auto": false,
+      "metadata": {}
+    },
+    {
+      "from_state": "ARCHITECT_ENTRY",
+      "to_state": "ARCHITECT_CHECK",
+      "at": "2026-06-16T07:00:38.647758Z",
+      "trigger": "manual",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "ARCHITECT_CHECK",
+      "to_state": "ARCHITECT_DONE",
+      "at": "2026-06-16T07:00:38.647761Z",
+      "trigger": "manual",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "ARCHITECT_DONE",
+      "to_state": "CODER_ENTRY",
+      "at": "2026-06-16T07:09:11.188634Z",
+      "trigger": "manual",
+      "auto": false,
+      "metadata": {}
+    },
+    {
+      "from_state": "CODER_ENTRY",
+      "to_state": "CODER_CHECK",
+      "at": "2026-06-16T08:56:57.071835Z",
+      "trigger": "manual",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "CODER_CHECK",
+      "to_state": "REVIEWER_ENTRY",
+      "at": "2026-06-16T08:56:57.149147Z",
+      "trigger": "manual",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "CODER_ENTRY",
+      "to_state": "CODER_CHECK",
+      "at": "2026-06-16T08:58:03.711677Z",
+      "trigger": "manual",
+      "auto": false,
+      "metadata": {}
+    },
+    {
+      "from_state": "CODER_CHECK",
+      "to_state": "REVIEWER_ENTRY",
+      "at": "2026-06-16T08:58:03.711677Z",
+      "trigger": "auto",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "REVIEWER_ENTRY",
+      "to_state": "REVIEWER_CHECK",
+      "at": "2026-06-16T08:58:03.711677Z",
+      "trigger": "manual",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "REVIEWER_CHECK",
+      "to_state": "QA_ENTRY",
+      "at": "2026-06-16T08:58:03.711677Z",
+      "trigger": "auto",
+      "auto": true,
+      "metadata": {}
+    },
+    {
+      "from_state": "QA_ENTRY",
+      "to_state": "QA_CHECK",
+      "at": "2026-06-16T08:58:03.711677Z",
+      "trigger": "manual",
+      "auto": true,
+      "metadata": {}
+    }
+  ],
+  "lint_results": {
+    "L1": null,
+    "L2": null,
+    "L2.5": null,
+    "L3": null
+  },
+  "started_at": "2026-06-16T00:59:26.138343Z",
+  "updated_at": "2026-06-16T08:58:03.711677Z",
+  "metadata": {
+    "orchestrator_version": "2.1.0",
+    "description": "Profile Soul 架构落地与机制验证"
+  }
+}
