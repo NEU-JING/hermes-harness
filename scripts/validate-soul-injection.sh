@@ -108,10 +108,10 @@ check_profile_soul() {
     done
 
     local coverage=$((found_keywords * 100 / total_keywords))
-    if [ "$coverage" -ge 60 ]; then
-        echo -e "  ${GREEN}✓${NC} 关键词覆盖率: ${coverage}% ($found_keywords/$total_keywords)"
+    if [ "$coverage" -ge 100 ]; then
+        echo -e "  ${GREEN}✓${NC} 关键词覆盖率: ${coverage}% ($found_keywords/$total_keywords) — 全匹配"
     else
-        echo -e "  ${YELLOW}⚠${NC} 关键词覆盖率较低: ${coverage}% ($found_keywords/$total_keywords)"
+        echo -e "  ${YELLOW}⚠${NC} 关键词覆盖率不足: ${coverage}% ($found_keywords/$total_keywords) — 需要 ${total_keywords}/${total_keywords} 全匹配"
     fi
 
     echo ""
