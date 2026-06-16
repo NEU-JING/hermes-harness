@@ -157,7 +157,7 @@ metadata:
 
 ## Agent Delegation via Kanban + Profile（Agent委托）
 
-编排器使用 **Kanban + Profile 原生机制**调度各角色Agent。**不需要调用 `delegate_task`**，不支持 `profile` 参数（delegate_task 签名中不存在）。
+编排器使用 **Kanban + Profile 原生机制**调度各角色Agent。**不需要使用已废弃的 Profile 参数方式（不支持的）**。
 
 > ⚡ 这是经过实战验证的、唯一可行的委托模式。详见 [kanban-profile-integration.md](./references/kanban-profile-integration.md)
 

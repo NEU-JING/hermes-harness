@@ -8,13 +8,13 @@
 
 ## 核心发现
 
-### ❌ 绝对不能用的方案：delegate_task profile 参数
+### ❌ 绝对不能用的方案：旧 profile 参数方式
 
 **根本不存在！** `/usr/local/lib/hermes-agent/hermes_cli/delegate_tool.py` 源码中完全没有 `profile` 参数的处理逻辑。
 
 - 旧版技能文档中描述的 Profile 委托机制**仅停留在设计层面**
-- `delegate_task()` 函数签名根本没有 `profile` 参数
-- 所有子 agent 始终共享同一个模型配置
+- 相关函数签名根本没有 `profile` 参数
+- 所有子 agent 始终共用同一个模型配置
 - **即使源码改了也不能用**——用户明确禁止修改 Hermes 源码
 
 ### ✅ 真正有效的方案：Kanban + Profile（原生机制）
