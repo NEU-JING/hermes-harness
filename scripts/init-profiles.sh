@@ -20,12 +20,12 @@ PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
 # Profile 定义
 declare -A PROFILE_SKILLS=(
-    ["sdd-po"]="po-agent"
-    ["sdd-ba"]="ba-agent"
-    ["sdd-architect"]="architect-agent"
-    ["sdd-coder"]="coder-agent"
-    ["sdd-reviewer"]="reviewer-agent"
-    ["sdd-qa"]="qa-agent"
+    ["sdd-po"]="po-agent|sdd-orchestrator"
+    ["sdd-ba"]="ba-agent|sdd-orchestrator"
+    ["sdd-architect"]="architect-agent|sdd-orchestrator"
+    ["sdd-coder"]="coder-agent|sdd-orchestrator"
+    ["sdd-reviewer"]="reviewer-agent|sdd-orchestrator"
+    ["sdd-qa"]="qa-agent|sdd-orchestrator"
 )
 
 PROFILE_LIST=("sdd-po" "sdd-ba" "sdd-architect" "sdd-coder" "sdd-reviewer" "sdd-qa")
@@ -179,37 +179,35 @@ create_profile() {
         return 1
     fi
 
-    # 安装 Skill（通过符号链接方式）
-    echo -e "  配置 Skill: $skill_name..."
-    local skill_source="$PROJECT_ROOT/skills/sdd/$skill_name"
-    local skill_target="$profile_dir/skills/$skill_name"
+    # 安装多个 Skill（只装角色需要的，保持专业化）
+    echo -e "  安装角色特定 Skills..."
+    local skill_count=0
+    IFS='|' read -ra SKILL_ARRAY <<< "$skill_list"
+    for skill_name in "${SKILL_ARRAY[@]}"; do
+        local skill_source="$PROJECT_ROOT/skills/sdd/$skill_name"
+        local skill_target="$profile_dir/skills/$skill_name"
 
-    if [ -d "$skill_source" ]; then
-        mkdir -p "$(dirname "$skill_target")"
-        if ln -sf "$skill_source" "$skill_target" 2>/dev/null; then
-            echo -e "${GREEN}  ✓ Skill 已链接${NC}"
-        else
-            # 符号链接失败，尝试复制
-            if cp -r "$skill_source" "$skill_target" 2>/dev/null; then
-                echo -e "${GREEN}  ✓ Skill 已复制（符号链接失败，使用复制方式）${NC}"
+        if [ -d "$skill_source" ]; then
+            mkdir -p "$(dirname "$skill_target")"
+            if ln -sf "$skill_source" "$skill_target" 2>/dev/null; then
+                echo -e "    ${GREEN}✓${NC} $skill_name 已链接"
+                ((skill_count++))
             else
-                echo -e "${YELLOW}  ⚠ Skill 配置失败，请手动安装${NC}"
+                if cp -r "$skill_source" "$skill_target" 2>/dev/null; then
+                    echo -e "    ${GREEN}✓${NC} $skill_name 已复制"
+                    ((skill_count++))
+                else
+                    echo -e "    ${YELLOW}⚠ $skill_name 配置失败${NC}"
+                fi
             fi
+        else
+            echo -e "    ${YELLOW}⚠ Skill 源码不存在：$skill_source${NC}"
         fi
-    else
-        echo -e "${YELLOW}  ⚠ Skill 源码不存在：$skill_source${NC}"
-    fi
+    done
+    echo -e "${GREEN}  ✓ 已安装 $skill_count 个角色 Skills${NC}"
 
-    # 配置 external_dirs（让 Profile 能访问项目的所有 Skills）
-    local config_file="$profile_dir/config.yaml"
-    if [ ! -f "$config_file" ]; then
-        cat > "$config_file" <<EOF
-skills:
-  external_dirs:
-    - $PROJECT_ROOT/skills
-EOF
-        echo -e "${GREEN}  ✓ 配置文件已创建${NC}"
-    fi
+    # config.yaml 由 Hermes 自动生成，不需要手动写入
+    # （仅包含模型配置，不含任何项目路径绑定）
 
     echo -e "${GREEN}  ✓ $profile_name 初始化完成${NC}"
 }

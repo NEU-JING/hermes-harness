@@ -62,12 +62,13 @@ Hermes SDD 框架采用 **Profile + Soul 双层差异化架构**，实现真正�
 
 | 角色 | Profile 名称 | 推荐模型 | Provider | Soul 核心特质 | 对应 Skill |
 |------|-------------|---------|----------|--------------|-----------|
-| **PO** | sdd-po | doubao-seed-2.0-pro | 火山引擎 | 用户思维、场景化、价值导向 | po-agent |
-| **BA** | sdd-ba | doubao-seed-2.0-pro | 火山引擎 | MECE、边界清晰、可测性优先 | ba-agent |
-| **Architect** | sdd-architect | glm-5.1 | 火山引擎 | 权衡分析、分层设计、演进式思维 | architect-agent |
-| **Coder** | sdd-coder | doubao-seed-2.0-code | 火山引擎 | TDD、防御式编程、可读性优先 | coder-agent |
+| **PO** | sdd-po | deepseek-v4-flash | DeepSeek | 用户思维、场景化、价值导向 | po-agent |
+| **BA** | sdd-ba | deepseek-v4-flash | DeepSeek | MECE、边界清晰、可测性优先 | ba-agent |
+| **Architect** | sdd-architect | deepseek-v4-flash | DeepSeek | 权衡分析、分层设计、演进式思维 | architect-agent |
+| **Coder** | sdd-coder | deepseek-v4-flash | DeepSeek | TDD、防御式编程、可读性优先 | coder-agent |
 | **Reviewer** | sdd-reviewer | deepseek-v4-pro | DeepSeek | 批判性、三阶段评审、异质视角 | reviewer-agent |
-| **QA** | sdd-qa | doubao-seed-2.0-pro | 火山引擎 | 破坏式、组合覆盖、回归意识 | qa-agent |
+| **QA** | sdd-qa | deepseek-v4-flash | DeepSeek | 破坏式、组合覆盖、回归意识 | qa-agent |
+| **Orchestrator** | — | — | — | 状态机调度、流程编排 | sdd-orchestrator |
 
 > **异构评审模式**: Reviewer 角色使用独立的 DeepSeek Provider 和模型，提供与开发阶段完全不同的第三方视角，避免"同一个模型审自己的代码"导致的盲区。
 
