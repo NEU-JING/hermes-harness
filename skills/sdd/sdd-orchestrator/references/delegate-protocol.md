@@ -24,7 +24,6 @@
 ```yaml
 delegate_task:
   goal: "[明确的目标描述]"
-  profile: "sdd-flash"        # v2.1.0 NEW: 可选 Profile 名称
   
   context: |
     ## 变更上下文
@@ -193,7 +192,6 @@ def handle_agent_failure(result: AgentResult, current_state: str):
 ```yaml
 delegate_task:
   goal: "产出PRD文档：定义变更的背景、目标、功能范围、非目标、成功指标、用户场景"
-  profile: "sdd-flash"
   
   context: |
     change_id: "{change_id}"
@@ -234,7 +232,6 @@ delegate_task:
 ```yaml
 delegate_task:
   goal: "根据PRD产出Spec文档：细化需求清单，编写AC（Given-When-Then格式）"
-  profile: "sdd-flash"
   
   context: |
     change_id: "{change_id}"
@@ -283,7 +280,6 @@ delegate_task:
 ```yaml
 delegate_task:
   goal: "根据Spec产出Design文档和Tasks拆分"
-  profile: "sdd-pro"
   
   context: |
     change_id: "{change_id}"
@@ -336,7 +332,6 @@ delegate_task:
 # 为每个Task调用一次
 delegate_task:
   goal: "实现Task {task_id}: {task_name} — 遵循TDD（RED-GREEN-REFACTOR）"
-  profile: "sdd-pro"
   
   context: |
     change_id: "{change_id}"
@@ -411,8 +406,8 @@ for task in tasks:
 ```yaml
 delegate_task:
   goal: "三阶段评审：Spec合规检查、代码质量检查、架构一致性检查"
-  profile: "sdd-reviewer"
-  
+  model: "deepseek-v4-pro"  # 方案 A: Reviewer 固定使用 pro 模型，确保评审质量
+
   context: |
     change_id: "{change_id}"
     
@@ -482,7 +477,6 @@ delegate_task:
 ```yaml
 delegate_task:
   goal: "执行测试验证：AC覆盖检查、测试执行、环境差异检查"
-  profile: "sdd-flash"
   
   context: |
     change_id: "{change_id}"
@@ -605,6 +599,48 @@ def handle_delegate_failure(error, current_state):
 - [ ] 产物路径格式正确
 - [ ] AGENTS.md约束已加载
 - [ ] 输出目录已创建
+- [ ] **workspace 路径存在且为绝对路径**（v2.1.0 新增，AC15/AC16）
+- [ ] **workspace_path 指向有效目录**（v2.1.0 新增，AC16）
+
+---
+
+## Workspace 路径规范（v2.1.0 新增）
+
+### 路径传递规则
+
+所有通过 Kanban 委托的任务必须遵循以下 workspace 路径规范：
+
+1. **workspace_path 必须为绝对路径**：使用 `Path.resolve()` 确保路径绝对化
+2. **创建任务前验证路径存在**：`workspace_path.exists()` 且 `workspace_path.is_dir()`
+3. **路径不一致时阻断委托**：输出明确错误信息，不创建 Kanban 任务
+
+### Worker 启动规范
+
+Worker Agent 启动时必须：
+
+1. 读取 `HERMES_KANBAN_WORKSPACE` 环境变量
+2. 验证 workspace 目录存在，不存在则 `kanban_block(reason="workspace路径不存在: ...")`
+3. 在 workspace 目录下操作，产物写入 `docs/changes/{change_id}/` 相对路径
+4. 不依赖 CWD（当前工作目录），使用环境变量提供的路径
+
+### 跨会话一致性保障
+
+- orchestrator.py 使用 `self.project_root.resolve()` 生成绝对路径
+- 每次委托时验证 workspace 路径有效性
+- 所有阶段使用相同的 workspace 配置（`dir:{abs_path}`）
+
+### 路径验证示例
+
+```python
+# orchestrator.py delegate_agent() 中的路径验证
+workspace_path = self.project_root.resolve()
+if not workspace_path.exists():
+    print(f"❌ Workspace 路径不存在: {workspace_path}")
+    return
+if not workspace_path.is_dir():
+    print(f"❌ Workspace 路径不是目录: {workspace_path}")
+    return
+```
 
 ---
 

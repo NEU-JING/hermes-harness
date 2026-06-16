@@ -23,7 +23,7 @@ import argparse
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional, Tuple
-from dataclasses import dataclass, asdict
+from dataclasses import dataclass, asdict, field
 from enum import Enum
 
 # 状态定义
@@ -127,6 +127,7 @@ class StateHistoryEntry:
     at: str
     trigger: str
     auto: bool
+    metadata: Dict = field(default_factory=dict)
 
 @dataclass
 class LintResult:
@@ -148,14 +149,19 @@ class SDDState:
     started_at: str
     updated_at: str
     metadata: Dict
+    model_audit: List[Dict] = field(default_factory=list)  # C3: 模型使用审计
 
 class SDDOrchestrator:
     """SDD编排器核心类 v2.1.0"""
     
     VERSION = "2.1.0"
     
-    def __init__(self, project_root: str = "."):
-        self.project_root = Path(project_root)
+    def __init__(self, project_root: str = None):
+        if project_root is None:
+            # 从脚本位置推导项目根目录，不依赖 CWD
+            self.project_root = Path(__file__).resolve().parents[4]
+        else:
+            self.project_root = Path(project_root).resolve()
         self.changes_dir = self.project_root / "docs" / "changes"
         self.archive_dir = self.project_root / "docs" / "archive"
         self.current_dir = self.project_root / "docs" / "current"
@@ -264,14 +270,14 @@ class SDDOrchestrator:
         else:
             return "Standard"
 
-    # Profile 默认映射（来自 shared/sdd-rules.md）
+    # Profile 默认映射（完全对齐 AGENTS.md 的 6 个 Profile）
     ROLE_TO_PROFILE_DEFAULT = {
-        "po": "sdd-flash",
-        "ba": "sdd-flash",
-        "architect": "sdd-pro",
-        "coder": "sdd-pro",
+        "po": "sdd-po",
+        "ba": "sdd-ba",
+        "architect": "sdd-architect",
+        "coder": "sdd-coder",
         "reviewer": "sdd-reviewer",
-        "qa": "sdd-flash",
+        "qa": "sdd-qa",
     }
 
     def load_profile_mapping(self) -> Dict[str, str]:
@@ -375,7 +381,8 @@ class SDDOrchestrator:
             return False
 
     def execute_lint(self, level: str, change_id: str) -> Tuple[bool, List[str]]:
-        """执行lint检查"""
+        """执行lint检查（v2.2: 升级为内容质量检查）"""
+        import re
         change_dir = self.changes_dir / change_id
 
         print(f"🔍 执行 Level {level} 检查...")
@@ -387,27 +394,69 @@ class SDDOrchestrator:
             if not change_dir.exists():
                 errors.append(f"变更目录不存在: {change_dir}")
 
-        # Level 1: 基础产物检查
+        # Level 1: PRD 章节完整性检查（内容质量）
         if "L1" in level:
             prd_file = change_dir / "prd.md"
             spec_file = change_dir / "spec.md"
 
-            if not prd_file.exists():
+            if prd_file.exists() and prd_file.stat().st_size > 0:
+                # L1: PRD 必须包含 5 大章节
+                content = prd_file.read_text()
+                required_sections = [
+                    (r'## 背景|## 背景与目标', "背景"),
+                    (r'## 用户场景|## 用例', "用户场景"),
+                    (r'## 功能范围|## In Scope', "功能范围"),
+                    (r'## 非功能需求|## NFR', "非功能需求"),
+                    (r'## 验收标准', "验收标准"),
+                ]
+                for pattern, name in required_sections:
+                    if not re.search(pattern, content):
+                        errors.append(f"PRD 缺少章节: {name}")
+            elif not prd_file.exists():
                 errors.append("prd.md 不存在")
             elif prd_file.stat().st_size == 0:
                 errors.append("prd.md 为空文件")
 
-            if "L1+L2" in level and not spec_file.exists():
-                errors.append("spec.md 不存在")
+            if "L1+L2" in level:
+                if spec_file.exists() and spec_file.stat().st_size > 0:
+                    spec_content = spec_file.read_text()
+                    # L1+L2: Spec 必须包含 AC 且格式符合 Scenario 规范
+                    if not re.search(r'#### Scenario AC\d+:', spec_content):
+                        errors.append("Spec 缺少 Scenario AC（格式：`#### Scenario AC{n}:`）")
+                    # 检查 AC 包含 WHEN/THEN/AND
+                    ac_count = len(re.findall(r'#### Scenario AC\d+:', spec_content))
+                    when_count = len(re.findall(r'- \*\*WHEN\*\*', spec_content))
+                    if ac_count > 0 and when_count < ac_count:
+                        errors.append(f"AC 格式不完整: {ac_count} 个 Scenario 但只有 {when_count} 个 WHEN")
+                elif not spec_file.exists():
+                    errors.append("spec.md 不存在")
 
-        # Level 2: 设计产物检查
+        # Level 2: 设计产物内容检查
         if "L2" in level:
             design_file = change_dir / "design.md"
             tasks_file = change_dir / "tasks.md"
 
-            if not design_file.exists():
-                errors.append("design.md 不存在")
-            if not tasks_file.exists():
+            if design_file.exists() and design_file.stat().st_size > 0:
+                design_content = design_file.read_text()
+                # 检查包含架构图、接口定义、数据结构、任务拆分
+                arch_indicators = [r'## 架构', r'架构图', r'架构总览', r'系统组件']
+                if not any(re.search(p, design_content) for p in arch_indicators):
+                    errors.append("Design 缺少架构描述（应包含架构图或架构总览章节）")
+                if not re.search(r'## .*接口|## .*API|接口定义', design_content):
+                    errors.append("Design 缺少接口定义")
+                if not re.search(r'## .*数据|数据模型|数据结构', design_content):
+                    errors.append("Design 缺少数据模型/结构定义")
+                if not re.search(r'## .*任务|任务拆分', design_content):
+                    errors.append("Design 缺少任务拆分章节")
+            else:
+                if not design_file.exists():
+                    errors.append("design.md 不存在")
+
+            if tasks_file.exists() and tasks_file.stat().st_size > 0:
+                tasks_content = tasks_file.read_text()
+                if not re.search(r'### Task ', tasks_content):
+                    errors.append("tasks.md 不包含 Task 定义")
+            elif not tasks_file.exists():
                 errors.append("tasks.md 不存在")
 
         # Level 2.5: 代码产物检查
@@ -431,7 +480,6 @@ class SDDOrchestrator:
 
         # R10: PR流程检查
         if "R10" in level:
-            # 简化检查：检查是否有merge commit
             import subprocess
             try:
                 result = subprocess.run(
@@ -517,30 +565,56 @@ class SDDOrchestrator:
 
         return True
 
+    def _poll_kanban_task(self, task_id: str, poll_interval: int = 5, timeout: int = 3600) -> str:
+        """轮询 Kanban 任务状态，返回 done / blocked / timeout"""
+        import subprocess, time
+        deadline = time.time() + timeout
+        while time.time() < deadline:
+            result = subprocess.run(
+                ["hermes", "kanban", "list"],
+                capture_output=True, text=True, timeout=15
+            )
+            for line in result.stdout.split("\n"):
+                if task_id in line and "done" in line:
+                    return "done"
+                if task_id in line and "blocked" in line:
+                    return "blocked"
+            time.sleep(poll_interval)
+        return "timeout"
+
     def delegate_agent(self, change_id: str, state: State):
-        """委托Agent执行任务（v2.1.0: 支持 Profile 感知委托）"""
+        """委托Agent执行任务（v2.1.0 真正的 Kanban Profile 调度）
+        
+        使用 Hermes 原生 Kanban 机制：
+        1. hermes kanban create 创建任务，指定 --assignee=<profile>
+        2. Kanban 调度器自动执行：hermes -p <profile> chat -q "work kanban task XXX"
+        3. 每个 Profile 用自己的 config.yaml，天然实现不同模型用在不同阶段
+        """
         agent_skill = STATE_AGENT_MAP.get(state)
         if not agent_skill:
             return
-
-        # v2.1.0: Profile 解析
+        
+        # 解析 Profile
         role = STATE_ROLE_MAP.get(state)
         profile = self.get_profile_for_role(role) if role else None
-
-        if profile:
-            print(f"\n🔷 委托 {agent_skill} → Profile: {profile}")
-        else:
-            print(f"\n📤 委托 {agent_skill}（无 Profile，使用默认模式）")
-
-        # 构建委托上下文
+        
+        if not profile:
+            print(f"⚠️  未找到角色 {role} 对应的 Profile，跳过委托")
+            return
+        
+        print(f"\n🔷 委托 {agent_skill} → Profile: {profile}")
+        
+        # 构建任务上下文
         change_dir = self.changes_dir / change_id
-
+        state_name = state.state_name.replace('_ENTRY', '').replace('_', ' ')
+        
         context = {
             "change_id": change_id,
             "current_state": state.state_name,
             "change_dir": str(change_dir),
+            "stage": state_name,
         }
-
+        
         # 添加上下文产物路径
         if state == State.BA_ENTRY:
             context["prd_path"] = str(change_dir / "prd.md")
@@ -556,25 +630,119 @@ class SDDOrchestrator:
         elif state == State.QA_ENTRY:
             context["spec_path"] = str(change_dir / "spec.md")
             context["review_path"] = str(change_dir / "review-report.md")
+        
+        # 构建 task body
+        body_lines = [f"# {change_id}: {state_name} 阶段", ""]
+        body_lines.append("## 任务目标")
+        body_lines.append(f"产出{state_name}阶段产物，使用 skill: {agent_skill}")
+        body_lines.append("")
+        body_lines.append("## 上下文")
+        for k, v in context.items():
+            body_lines.append(f"- {k}: {v}")
+        body_lines.append("")
+        body_lines.append("## 完成标准")
+        body_lines.append("- 按要求产出所有产物文件")
+        body_lines.append("- 文件格式符合 SDD 规范")
+        body_lines.append("- 内容质量通过门禁检查")
+        
+        task_body = "\n".join(body_lines)
+        
+        # 验证 workspace 路径存在性（AC15/AC16）
+        workspace_path = self.project_root.resolve()
+        if not workspace_path.exists():
+            print(f"❌ Workspace 路径不存在: {workspace_path}")
+            return
+        if not workspace_path.is_dir():
+            print(f"❌ Workspace 路径不是目录: {workspace_path}")
+            return
 
-        # 输出委托信息（实际应调用delegate_task工具）
-        print(f"""
-━━━━━━━━━━━━━━━━━━━━
-委托详情:
-  Skill: {agent_skill}
-  Profile: {profile or 'default'}   # v2.1.0
-  Goal: 产出{state.state_name.replace('_ENTRY', '').replace('_', ' ')}阶段产物
-  Context:
-{json.dumps(context, indent=4)}
-━━━━━━━━━━━━━━━━━━━━
+        # 创建 Kanban 任务（Kanban 调度器会自动 spawn Profile 对应的 Agent）
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["hermes", "kanban", "create",
+                 f"{change_id}: {state_name} 阶段",
+                 "--assignee", profile,
+                 "--body", task_body,
+                 "--skill", agent_skill,
+                 "--workspace", f"dir:{workspace_path}"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
 
-注: 实际应调用 delegate_task(skill='{agent_skill}', profile='{profile or ""}', context=...)
-此处仅演示状态机推进逻辑。
-""")
+            if result.returncode == 0:
+                # 提取 Task ID
+                task_id = ""
+                for line in result.stdout.split("\n"):
+                    if "Task ID:" in line or "task_id:" in line:
+                        task_id = line.split(":")[-1].strip()
+                    elif "t_" in line:
+                        import re
+                        m = re.search(r'(t_\w+)', line)
+                        if m:
+                            task_id = m.group(1)
 
-        # 模拟Agent完成（实际应等待delegate返回）
-        print(f"⏳ 等待 {agent_skill} 完成...")
-        print(f"(实际流程中，Agent完成后会自动推进到 {state.state_name.replace('ENTRY', 'CHECK')})")
+                print(f"✅ Kanban 任务已创建")
+                print(f"   Task ID: {task_id}")
+                print(f"")
+                print(f"📋 调度器将自动执行: hermes -p {profile} chat -q 'work kanban task <id>'")
+                print(f"   模型由 Profile 配置决定: {profile} 用自己的模型")
+                print(f"")
+
+                # C1: 轮询等待任务完成（最多重试 3 次，每次超时 3600s）
+                print(f"⏳ 轮询等待任务完成...")
+                max_retries = 3
+                for attempt in range(max_retries):
+                    print(f"   第 {attempt + 1}/{max_retries} 次轮询（间隔 5s）...")
+                    status = self._poll_kanban_task(task_id, poll_interval=5, timeout=600)
+                    print(f"   任务状态: {status}")
+
+                    if status == "done":
+                        print(f"✅ 任务完成！自动推进状态...")
+                        # 确定下一个门禁状态
+                        next_gate_states = {
+                            State.PO_ENTRY: "PO_CHECK",
+                            State.BA_ENTRY: "BA_CHECK",
+                            State.ARCHITECT_ENTRY: "ARCHITECT_CHECK",
+                            State.CODER_ENTRY: "CODER_CHECK",
+                            State.REVIEWER_ENTRY: "REVIEWER_CHECK",
+                            State.QA_ENTRY: "QA_CHECK",
+                        }
+                        next_gate = next_gate_states.get(state)
+                        if next_gate:
+                            self.transition(change_id, next_gate)
+                        return
+                    elif status == "blocked" and attempt < max_retries - 1:
+                        print(f"🔄 任务阻塞，重试...")
+                        continue
+                    elif status == "blocked":
+                        print(f"❌ 任务连续 {max_retries} 次阻塞，标记为 BLOCKED")
+                        # 记录阻塞原因
+                        state_data = self.load_state(change_id)
+                        if state_data:
+                            # 直接添加到 state_history
+                            block_entry = StateHistoryEntry(
+                                from_state=state.state_name,
+                                to_state="BLOCKED",
+                                at=datetime.utcnow().isoformat() + "Z",
+                                trigger="auto",
+                                auto=True,
+                            )
+                            state_data.state_history.append(block_entry)
+                            state_data.current_state = "BLOCKED"
+                            self.save_state(change_id, state_data)
+                        return
+                    else:
+                        print(f"⏰ 任务超时（{status}），尝试重试...")
+                        continue
+
+                print(f"❌ 所有重试耗尽，任务未完成")
+            else:
+                print(f"❌ Kanban 任务创建失败: {result.stderr}")
+
+        except Exception as e:
+            print(f"❌ 创建任务异常: {e}")
 
     def prompt_user(self, change_id: str, state: State):
         """提示用户输入"""
@@ -691,6 +859,44 @@ class SDDOrchestrator:
                         status_icon = "✅" if State[state.current_state].state_type == StateType.TERMINAL else "⏳"
                         print(f"  {status_icon} {cid}: {state.current_state}")
 
+    def do_audit(self, change_id: str):
+        """输出模型使用审计报告（C3）"""
+        state = self.load_state(change_id)
+        if not state:
+            print(f"❌ 变更不存在: {change_id}")
+            return
+
+        print(f"""
+📊 模型使用审计报告
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+变更ID: {change_id}
+总阶段数: {len(state.state_history)}
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+""")
+        for i, entry in enumerate(state.state_history):
+            model = entry.metadata.get("model", "N/A") if hasattr(entry, 'metadata') else "N/A"
+            provider = entry.metadata.get("provider", "N/A") if hasattr(entry, 'metadata') else "N/A"
+            print(f"  {i+1}. {entry.from_state} → {entry.to_state}")
+            print(f"     触发: {'自动' if entry.auto else '手动'} | 时间: {entry.at[:19]}")
+
+        # 显示专门的 audit 记录
+        if state.model_audit:
+            print(f"\n📋 详细审计记录:")
+            for record in state.model_audit:
+                print(f"  - 阶段: {record.get('stage')}")
+                print(f"    模型: {record.get('model')}")
+                print(f"    Provider: {record.get('provider')}")
+                print(f"    Kanban任务: {record.get('kanban_task_id')}")
+                print(f"    时间: {record.get('at')[:19]}")
+                print("")
+
+        # 模型一致性检查
+        models_used = set(r.get("model") for r in state.model_audit if r.get("model"))
+        if len(models_used) > 1:
+            print(f"⚠️  使用了 {len(models_used)} 种不同模型: {', '.join(models_used)}")
+        elif len(models_used) == 1:
+            print(f"✅ 所有阶段使用同一模型: {list(models_used)[0]}")
+
 
 def main():
     parser = argparse.ArgumentParser(description="SDD Orchestrator v2.1")
@@ -714,6 +920,10 @@ def main():
     trans_parser = subparsers.add_parser("transition", help="手动状态转换")
     trans_parser.add_argument("change_id", help="变更ID")
     trans_parser.add_argument("target_state", help="目标状态")
+
+    # audit 命令（C3）
+    audit_parser = subparsers.add_parser("audit", help="模型使用审计")
+    audit_parser.add_argument("change_id", help="变更ID")
 
     args = parser.parse_args()
 
@@ -742,6 +952,8 @@ def main():
             print(f"\n❌ 转换失败")
             sys.exit(1)
 
+    elif args.command == "audit":
+        orchestrator.do_audit(args.change_id)
 
 if __name__ == "__main__":
     main()
