@@ -518,29 +518,38 @@ class SDDOrchestrator:
         return True
 
     def delegate_agent(self, change_id: str, state: State):
-        """委托Agent执行任务（v2.1.0: 支持 Profile 感知委托）"""
+        """委托Agent执行任务（v2.1.0 真正的 Kanban Profile 调度）
+        
+        使用 Hermes 原生 Kanban 机制：
+        1. hermes kanban create 创建任务，指定 --assignee=<profile>
+        2. Kanban 调度器自动执行：hermes -p <profile> chat -q "work kanban task XXX"
+        3. 每个 Profile 用自己的 config.yaml，天然实现不同模型用在不同阶段
+        """
         agent_skill = STATE_AGENT_MAP.get(state)
         if not agent_skill:
             return
-
-        # v2.1.0: Profile 解析
+        
+        # 解析 Profile
         role = STATE_ROLE_MAP.get(state)
         profile = self.get_profile_for_role(role) if role else None
-
-        if profile:
-            print(f"\n🔷 委托 {agent_skill} → Profile: {profile}")
-        else:
-            print(f"\n📤 委托 {agent_skill}（无 Profile，使用默认模式）")
-
-        # 构建委托上下文
+        
+        if not profile:
+            print(f"⚠️  未找到角色 {role} 对应的 Profile，跳过委托")
+            return
+        
+        print(f"\n🔷 委托 {agent_skill} → Profile: {profile}")
+        
+        # 构建任务上下文
         change_dir = self.changes_dir / change_id
-
+        state_name = state.state_name.replace('_ENTRY', '').replace('_', ' ')
+        
         context = {
             "change_id": change_id,
             "current_state": state.state_name,
             "change_dir": str(change_dir),
+            "stage": state_name,
         }
-
+        
         # 添加上下文产物路径
         if state == State.BA_ENTRY:
             context["prd_path"] = str(change_dir / "prd.md")
@@ -556,25 +565,60 @@ class SDDOrchestrator:
         elif state == State.QA_ENTRY:
             context["spec_path"] = str(change_dir / "spec.md")
             context["review_path"] = str(change_dir / "review-report.md")
+        
+        # 构建 task body
+        body_lines = [f"# {change_id}: {state_name} 阶段", ""]
+        body_lines.append("## 任务目标")
+        body_lines.append(f"产出{state_name}阶段产物，使用 skill: {agent_skill}")
+        body_lines.append("")
+        body_lines.append("## 上下文")
+        for k, v in context.items():
+            body_lines.append(f"- {k}: {v}")
+        body_lines.append("")
+        body_lines.append("## 完成标准")
+        body_lines.append("- 按要求产出所有产物文件")
+        body_lines.append("- 文件格式符合 SDD 规范")
+        body_lines.append("- 内容质量通过门禁检查")
+        
+        task_body = "\n".join(body_lines)
+        
+        # 验证 workspace 路径存在性（AC15/AC16）
+        workspace_path = self.project_root.resolve()
+        if not workspace_path.exists():
+            print(f"❌ Workspace 路径不存在: {workspace_path}")
+            return
+        if not workspace_path.is_dir():
+            print(f"❌ Workspace 路径不是目录: {workspace_path}")
+            return
 
-        # 输出委托信息（实际应调用delegate_task工具）
-        print(f"""
-━━━━━━━━━━━━━━━━━━━━
-委托详情:
-  Skill: {agent_skill}
-  Profile: {profile or 'default'}   # v2.1.0
-  Goal: 产出{state.state_name.replace('_ENTRY', '').replace('_', ' ')}阶段产物
-  Context:
-{json.dumps(context, indent=4)}
-━━━━━━━━━━━━━━━━━━━━
-
-注: 实际应调用 delegate_task(skill='{agent_skill}', profile='{profile or ""}', context=...)
-此处仅演示状态机推进逻辑。
-""")
-
-        # 模拟Agent完成（实际应等待delegate返回）
-        print(f"⏳ 等待 {agent_skill} 完成...")
-        print(f"(实际流程中，Agent完成后会自动推进到 {state.state_name.replace('ENTRY', 'CHECK')})")
+        # 创建 Kanban 任务（Kanban 调度器会自动 spawn Profile 对应的 Agent）
+        import subprocess
+        try:
+            result = subprocess.run(
+                ["hermes", "kanban", "create",
+                 f"{change_id}: {state_name} 阶段",
+                 "--assignee", profile,
+                 "--body", task_body,
+                 "--skill", agent_skill,
+                 "--workspace", f"dir:{workspace_path}"],
+                capture_output=True,
+                text=True,
+                timeout=30
+            )
+            
+            if result.returncode == 0:
+                print(f"✅ Kanban 任务已创建")
+                print(f"   Task ID: {result.stdout.strip().split()[-1] if result.stdout.strip() else '(see hermes kanban list)'}")
+                print(f"")
+                print(f"📋 调度器将自动执行: hermes -p {profile} chat -q 'work kanban task <id>'")
+                print(f"   模型由 Profile 配置决定: {profile} 用自己的模型")
+                print(f"")
+                print(f"⏳ 等待任务完成...（用 hermes kanban list 查看进度）")
+            else:
+                print(f"❌ Kanban 任务创建失败: {result.stderr}")
+                
+        except Exception as e:
+            print(f"❌ 创建任务异常: {e}")
 
     def prompt_user(self, change_id: str, state: State):
         """提示用户输入"""
